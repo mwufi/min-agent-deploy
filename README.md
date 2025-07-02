@@ -9,7 +9,7 @@
 </p>
 <div align="center">
   <h1>
-    Next.js Clerk auth starter template
+    Ara Intelligence Backend
   </h1>
   <a href="https://www.npmjs.com/package/@clerk/clerk-js">
     <img alt="" src="https://img.shields.io/npm/dm/@clerk/clerk-js" />
@@ -22,12 +22,10 @@
   </a>
   <br />
   <br />
-  <img alt="Clerk Hero Image" src="public/og.png">
+  <img alt="Hero Image" src="public/ara-header.png">
 </div>
 
 ## Introduction
-
-Clerk is a developer-first authentication and user management solution. It provides pre-built React components and hooks for sign-in, sign-up, user profile, and organization management. Clerk is designed to be easy to use and customize, and can be dropped into any React or Next.js application.
 
 This template allows you to get started with Clerk and Next.js (App Router) in a matter of minutes, and demonstrates features of Clerk such as:
 
@@ -38,7 +36,7 @@ This template allows you to get started with Clerk and Next.js (App Router) in a
 
 ## Demo
 
-A hosted demo of this example is available at https://clerk-nextjs-app-router.vercel.app/
+Visit us at [ara.computer](https://ara.computer)
 
 ## Deploy
 
