@@ -4,6 +4,7 @@ import { SignInButton, SignedIn, SignedOut, useUser } from "@clerk/nextjs";
 import "../styles/landing.css";
 import Link from "next/link";
 import { useState } from "react";
+import PipedreamConnect from "./pipedream-connect";
 
 export function DebugPage() {
   const { user } = useUser();
@@ -92,6 +93,8 @@ export function DebugPage() {
                 </div>
               )}
             </div>
+
+            <PipedreamConnect />
           </SignedIn>
 
           <SignedOut>
