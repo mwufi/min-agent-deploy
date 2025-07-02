@@ -3,6 +3,7 @@ import "./globals.css";
 import Script from "next/script";
 import localFont from "next/font/local";
 import { templateMetadata } from "./_template/content/metadata";
+import { QueryProvider } from "@/lib/providers/query-provider";
 
 export const metadata = templateMetadata;
 
@@ -42,7 +43,9 @@ export default function RootLayout({
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <ClerkProvider appearance={clerkAppearanceObject}>
         <body className={`min-h-screen flex flex-col antialiased`}>
-          {children}
+          <QueryProvider>
+            {children}
+          </QueryProvider>
         </body>
       </ClerkProvider>
 
