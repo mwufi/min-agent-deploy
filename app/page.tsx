@@ -1,14 +1,7 @@
-import { LandingHero } from "./_template/components/landing-hero";
-import { LearnMore } from "./_template/components/learn-more";
-import { Footer } from "./_template/components/footer";
-import { CARDS } from "./_template/content/cards";
+import { DebugPage } from "./_template/components/debug-page";
 
 export default function Home() {
   return (
-    <>
-      <LandingHero />
-      <LearnMore cards={CARDS} />
-      <Footer />
-    </>
+    <DebugPage />
   );
 }

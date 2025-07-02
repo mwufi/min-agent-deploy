@@ -2,14 +2,9 @@ import { UserDetails } from "../components/user-details";
 import { UserButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import { CodeSwitcher } from "../components/code-switcher";
-import { LearnMore } from "../_template/components/learn-more";
-import { Footer } from "../_template/components/footer";
 import { ClerkLogo } from "../_template/components/clerk-logo";
 import { NextLogo } from "../_template/components/next-logo";
 import Link from "next/link";
-
-import { DASHBOARD_CARDS } from "../_template/content/cards";
-import { DeployButton } from "../_template/components/deploy-button";
 
 export default async function DashboardPage() {
   await auth.protect();
@@ -59,15 +54,10 @@ export default async function DashboardPage() {
             <UserDetails />
           </div>
           <div className="flex flex-col">
-            <div className="flex items-center justify-center h-16 w-full">
-              <DeployButton className="h-8" />
-            </div>
             <CodeSwitcher />
           </div>
         </div>
       </main>
-      <LearnMore cards={DASHBOARD_CARDS} />
-      <Footer />
     </>
   );
 }
