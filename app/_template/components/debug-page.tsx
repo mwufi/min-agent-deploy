@@ -4,7 +4,7 @@ import { SignInButton, SignedIn, SignedOut, useUser } from "@clerk/nextjs";
 import "../styles/landing.css";
 import Link from "next/link";
 import { useState } from "react";
-import PipedreamConnect from "./pipedream-connect";
+
 
 export function DebugPage() {
   const { user } = useUser();
@@ -94,7 +94,40 @@ export function DebugPage() {
               )}
             </div>
 
-            <PipedreamConnect />
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Link
+                  href="/connect"
+                  className="flex items-center p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
+                >
+                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-gray-900">Connect Services</h3>
+                    <p className="text-sm text-gray-500">Connect Gmail, Slack, and more</p>
+                  </div>
+                </Link>
+
+                <Link
+                  href="/dashboard"
+                  className="flex items-center p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
+                >
+                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-gray-900">View Dashboard</h3>
+                    <p className="text-sm text-gray-500">See your data and analytics</p>
+                  </div>
+                </Link>
+              </div>
+            </div>
           </SignedIn>
 
           <SignedOut>

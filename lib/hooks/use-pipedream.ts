@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { createFrontendClient } from "@pipedream/sdk/browser";
 import { App, Component, Account } from "@/app/_template/components/pipedream_connect/types";
 
 // Query Keys
@@ -103,26 +104,21 @@ export const useConnectApp = (userId: string) => {
         mutationFn: async (app: App) => {
             const { token } = await createConnectToken(userId);
 
-            // Open Pipedream connect in a new window/popup
-            const connectUrl = `https://connect.pipedream.com/?token=${token}&app=${app.name_slug}`;
-            const popup = window.open(connectUrl, 'pipedream-connect', 'width=600,height=700');
+            const pd = createFrontendClient();
 
-            // Return a promise that resolves when the popup closes
             return new Promise<void>((resolve, reject) => {
-                const checkClosed = setInterval(() => {
-                    if (popup?.closed) {
-                        clearInterval(checkClosed);
+                pd.connectAccount({
+                    app: app.name_slug,
+                    token: token,
+                    onSuccess: (account) => {
+                        console.log(`Account successfully connected: ${account.id}`);
                         resolve();
+                    },
+                    onError: (err) => {
+                        console.error(`Connection error: ${err.message}`);
+                        reject(new Error(err.message));
                     }
-                }, 1000);
-
-                // Handle popup blocked or immediately closed
-                setTimeout(() => {
-                    if (!popup || popup.closed) {
-                        clearInterval(checkClosed);
-                        reject(new Error("Popup was blocked or closed"));
-                    }
-                }, 500);
+                });
             });
         },
         onSuccess: () => {

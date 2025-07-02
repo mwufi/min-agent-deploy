@@ -4,6 +4,7 @@ import Script from "next/script";
 import localFont from "next/font/local";
 import { templateMetadata } from "./_template/content/metadata";
 import { QueryProvider } from "@/lib/providers/query-provider";
+import { LayoutWrapper } from "@/app/components/layout-wrapper";
 
 export const metadata = templateMetadata;
 
@@ -44,7 +45,9 @@ export default function RootLayout({
       <ClerkProvider appearance={clerkAppearanceObject}>
         <body className={`min-h-screen flex flex-col antialiased`}>
           <QueryProvider>
-            {children}
+            <LayoutWrapper>
+              {children}
+            </LayoutWrapper>
           </QueryProvider>
         </body>
       </ClerkProvider>
