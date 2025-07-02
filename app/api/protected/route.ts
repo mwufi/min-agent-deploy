@@ -2,11 +2,13 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  await auth.protect();
+  const { userId, sessionId } = await auth();
 
   return NextResponse.json({
     message: "This is a protected route",
     timestamp: new Date().toISOString(),
+    userId,
+    sessionId,
   });
 }
 
