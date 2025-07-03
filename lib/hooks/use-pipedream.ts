@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFrontendClient } from "@pipedream/sdk/browser";
-import { App, Component, Account } from "@/app/_template/components/pipedream_connect/types";
+import { App, Component, Account, ComponentDefinition } from "@/app/_template/components/pipedream_connect/types";
 
 // Query Keys
 const QUERY_KEYS = {
     apps: (search?: string) => ["apps", search] as const,
     components: (appSlug: string) => ["components", appSlug] as const,
+    componentDefinition: (componentKey: string) => ["componentDefinition", componentKey] as const,
     accounts: (userId: string) => ["accounts", userId] as const,
     gmailTriggers: (userId: string) => ["gmailTriggers", userId] as const,
 } as const;
@@ -109,6 +110,14 @@ const fetchGmailTriggers = async (userId: string) => {
     return data.data || [];
 };
 
+const fetchComponentDefinition = async (componentKey: string): Promise<{ data: ComponentDefinition }> => {
+    const response = await fetch(`/api/pipedream/components/definition/${componentKey}`);
+    if (!response.ok) {
+        throw new Error("Failed to fetch component definition");
+    }
+    return response.json();
+};
+
 // Custom Hooks
 export const useApps = (searchQuery?: string) => {
     return useQuery({
@@ -202,6 +211,15 @@ export const useGmailTriggers = (userId: string) => {
         queryKey: QUERY_KEYS.gmailTriggers(userId),
         queryFn: () => fetchGmailTriggers(userId),
         enabled: !!userId,
+    });
+};
+
+export const useComponentDefinition = (componentKey: string | null) => {
+    return useQuery({
+        queryKey: QUERY_KEYS.componentDefinition(componentKey!),
+        queryFn: () => fetchComponentDefinition(componentKey!),
+        select: (data) => data.data,
+        enabled: !!componentKey, // Only fetch when a component is selected
     });
 };
 

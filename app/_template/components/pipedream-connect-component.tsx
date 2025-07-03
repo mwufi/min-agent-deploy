@@ -1,23 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { App } from "./pipedream_connect/types";
+import { App, Component } from "./pipedream_connect/types";
 import {
   useApps,
   useComponents,
   useAccounts,
   useConnectApp,
-  useDisconnectAccount
+  useDisconnectAccount,
+  useComponentDefinition
 } from "@/lib/hooks/use-pipedream";
+import ComponentDefinitionView from "./ComponentDefinitionView";
 
 export default function PipedreamConnect({ userId }: { userId: string }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedApp, setSelectedApp] = useState<App | null>(null);
+  const [selectedComponent, setSelectedComponent] = useState<Component | null>(null);
 
   // TanStack Query hooks
   const { data: apps = [], isLoading: appsLoading, error: appsError } = useApps(searchQuery);
   const { data: components = [], isLoading: componentsLoading } = useComponents(selectedApp?.name_slug || null);
   const { data: accounts = [], isLoading: accountsLoading } = useAccounts(userId);
+  const { data: componentDefinition, isLoading: definitionLoading } = useComponentDefinition(selectedComponent?.key || null);
   const connectAppMutation = useConnectApp(userId);
   const disconnectAccountMutation = useDisconnectAccount(userId);
 
@@ -29,7 +33,13 @@ export default function PipedreamConnect({ userId }: { userId: string }) {
 
   const handleSelectApp = (app: App) => {
     setSelectedApp(app);
+    setSelectedComponent(null); // Clear selected component when switching apps
     // Components will automatically load due to the useComponents hook
+  };
+
+  const handleSelectComponent = (component: Component) => {
+    setSelectedComponent(component);
+    // Component definition will automatically load due to the useComponentDefinition hook
   };
 
   const handleConnectApp = async (app: App) => {
@@ -259,7 +269,8 @@ export default function PipedreamConnect({ userId }: { userId: string }) {
                   {components.map((component) => (
                     <div
                       key={component.key}
-                      className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                      className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                      onClick={() => handleSelectComponent(component)}
                     >
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
@@ -282,11 +293,32 @@ export default function PipedreamConnect({ userId }: { userId: string }) {
                           )}
                         </div>
                       </div>
+                      <div className="mt-3 flex justify-end">
+                        <button
+                          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectComponent(component);
+                          }}
+                        >
+                          View Configuration →
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
+          )}
+
+          {/* Component Definition */}
+          {selectedComponent && (
+            <ComponentDefinitionView
+              selectedComponent={selectedComponent}
+              componentDefinition={componentDefinition}
+              definitionLoading={definitionLoading}
+              onClose={() => setSelectedComponent(null)}
+            />
           )}
 
           {/* Footer */}

@@ -22,6 +22,29 @@ export interface Component {
     type?: string;
 }
 
+// Configurable properties for a component (like "github-fetch-repo-commits")
+export interface ConfigurableProp {
+    name: string;
+    type: "app" | "string" | "integer" | "boolean" | "array" | "object";
+    label?: string;
+    description?: string;
+    optional?: boolean;
+    default?: any;
+    app?: string;
+    remoteOptions?: boolean;
+    options?: Array<{ label: string; value: any }>;
+    secret?: boolean;
+}
+
+export interface ComponentDefinition {
+    name: string;
+    version: string;
+    key: string;
+    description?: string;
+    type?: string;
+    configurable_props: ConfigurableProp[];
+}
+
 export interface Account {
     id: string;
     name: string;
