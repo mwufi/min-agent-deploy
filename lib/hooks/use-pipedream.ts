@@ -70,6 +70,34 @@ const disconnectAccount = async (accountId: string) => {
     return response.json();
 };
 
+const deployTrigger = async ({
+    externalUserId,
+    gmailAccountId,
+    triggerType = "gmail-new-email-received"
+}: {
+    externalUserId: string;
+    gmailAccountId?: string;
+    triggerType?: string;
+}) => {
+    const response = await fetch("/api/pipedream/triggers/deploy", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            externalUserId,
+            gmailAccountId,
+            triggerType
+        }),
+    });
+
+    if (!response.ok) {
+        throw new Error("Failed to deploy trigger");
+    }
+
+    return response.json();
+};
+
 // Custom Hooks
 export const useApps = (searchQuery?: string) => {
     return useQuery({
@@ -142,6 +170,18 @@ export const useDisconnectAccount = (userId: string) => {
         },
         onError: (error) => {
             console.error("Disconnection failed:", error);
+        },
+    });
+};
+
+export const useDeployTrigger = () => {
+    return useMutation({
+        mutationFn: deployTrigger,
+        onSuccess: (data) => {
+            console.log("Trigger deployed successfully:", data);
+        },
+        onError: (error) => {
+            console.error("Trigger deployment failed:", error);
         },
     });
 };
