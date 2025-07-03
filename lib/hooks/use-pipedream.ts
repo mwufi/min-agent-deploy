@@ -7,6 +7,7 @@ const QUERY_KEYS = {
     apps: (search?: string) => ["apps", search] as const,
     components: (appSlug: string) => ["components", appSlug] as const,
     accounts: (userId: string) => ["accounts", userId] as const,
+    gmailTriggers: (userId: string) => ["gmailTriggers", userId] as const,
 } as const;
 
 // API Functions
@@ -87,7 +88,8 @@ const deployTrigger = async ({
         body: JSON.stringify({
             externalUserId,
             gmailAccountId,
-            triggerType
+            triggerType,
+            timer: { "intervalSeconds": 180 }
         }),
     });
 
@@ -96,6 +98,15 @@ const deployTrigger = async ({
     }
 
     return response.json();
+};
+
+const fetchGmailTriggers = async (userId: string) => {
+    const response = await fetch(`/api/pipedream/triggers/list?external_user_id=${userId}`);
+    if (!response.ok) {
+        throw new Error("Failed to fetch Gmail triggers");
+    }
+    const data = await response.json();
+    return data.data || [];
 };
 
 // Custom Hooks
@@ -183,6 +194,14 @@ export const useDeployTrigger = () => {
         onError: (error) => {
             console.error("Trigger deployment failed:", error);
         },
+    });
+};
+
+export const useGmailTriggers = (userId: string) => {
+    return useQuery({
+        queryKey: QUERY_KEYS.gmailTriggers(userId),
+        queryFn: () => fetchGmailTriggers(userId),
+        enabled: !!userId,
     });
 };
 

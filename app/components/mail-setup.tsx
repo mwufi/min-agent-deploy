@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useAccounts, useDeployTrigger } from "@/lib/hooks/use-pipedream";
+import { useAccounts, useDeployTrigger, useGmailTriggers } from "@/lib/hooks/use-pipedream";
 import {
     EnvelopeIcon,
     Cog6ToothIcon,
@@ -9,6 +9,7 @@ import {
     CheckCircleIcon,
     ExclamationTriangleIcon
 } from "@heroicons/react/24/outline";
+import GmailTrigger from "./triggers/GmailTrigger";
 
 interface MailTemplate {
     id: string;
@@ -52,6 +53,8 @@ export default function MailSetup({ userId }: { userId: string }) {
     const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
     const [deployedTriggers, setDeployedTriggers] = useState<Record<string, any>>({});
     const deployTriggerMutation = useDeployTrigger();
+    const { data: gmailTriggers = [] } = useGmailTriggers(userId);
+    console.log("gmailTriggers", gmailTriggers);
 
     const gmailAccounts = accounts.filter(acc => acc.app.name_slug === "gmail");
 
@@ -154,11 +157,21 @@ export default function MailSetup({ userId }: { userId: string }) {
                                     Configure automated workflows for your connected Gmail accounts
                                 </p>
                             </div>
-                            <div className="flex items-center space-x-2">
-                                <CheckCircleIcon className="w-5 h-5 text-green-500" />
-                                <span className="text-sm font-medium text-green-700">
-                                    {gmailAccounts.length} Gmail account{gmailAccounts.length > 1 ? 's' : ''} connected
-                                </span>
+                            <div className="flex items-center space-x-4">
+                                <div className="flex items-center space-x-2">
+                                    <CheckCircleIcon className="w-5 h-5 text-green-500" />
+                                    <span className="text-sm font-medium text-green-700">
+                                        {gmailAccounts.length} Gmail account{gmailAccounts.length > 1 ? 's' : ''} connected
+                                    </span>
+                                </div>
+                                {gmailTriggers.length > 0 && (
+                                    <div className="flex items-center space-x-2">
+                                        <BoltIcon className="w-5 h-5 text-blue-500" />
+                                        <span className="text-sm font-medium text-blue-700">
+                                            {gmailTriggers.length} trigger{gmailTriggers.length > 1 ? 's' : ''} active
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -274,6 +287,23 @@ export default function MailSetup({ userId }: { userId: string }) {
                             })}
                         </div>
                     </div>
+
+                    {/* Active Gmail Triggers */}
+                    {gmailTriggers.length > 0 && (
+                        <div className="p-6 border-b border-gray-200">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg font-semibold text-gray-900">Active Gmail Triggers</h2>
+                                <span className="text-sm text-blue-600 bg-blue-100 px-3 py-1 rounded-full">
+                                    {gmailTriggers.length} trigger{gmailTriggers.length > 1 ? 's' : ''} running
+                                </span>
+                            </div>
+                            <div className="grid gap-4">
+                                {gmailTriggers.map((trigger: any) => (
+                                    <GmailTrigger key={trigger.id} trigger={trigger} />
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Mail Automation Templates */}
                     <div className="p-6">

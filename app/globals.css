@@ -9,6 +9,23 @@
     repeating-linear-gradient(90deg, transparent, transparent 11px, #f2f2f2 11px, #f2f2f2 12px);
 }
 
+/* Start Generation Here */
+/* Hide scrollbars for webkit browsers */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbars for Firefox */
+* {
+  scrollbar-width: none;
+}
+
+/* Hide scrollbars for IE/Edge */
+* {
+  -ms-overflow-style: none;
+}
+/* End Generation Here */
+
 .mask {
   mask-image: linear-gradient(
     to bottom,
