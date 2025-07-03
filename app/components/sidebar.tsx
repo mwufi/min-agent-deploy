@@ -9,18 +9,21 @@ import {
     Cog6ToothIcon,
     EnvelopeIcon,
     PlusIcon,
-    BoltIcon
+    BoltIcon,
+    ChatBubbleLeftRightIcon
 } from "@heroicons/react/24/outline";
 import {
     HomeIcon as HomeIconSolid,
     Cog6ToothIcon as Cog6ToothIconSolid,
     EnvelopeIcon as EnvelopeIconSolid,
-    BoltIcon as BoltIconSolid
+    BoltIcon as BoltIconSolid,
+    ChatBubbleLeftRightIcon as ChatBubbleLeftRightIconSolid
 } from "@heroicons/react/24/solid";
 import clsx from "clsx";
 
 const navigation = [
     { name: "Home", href: "/", icon: HomeIcon, activeIcon: HomeIconSolid },
+    { name: "AI Assistant", href: "/ai", icon: ChatBubbleLeftRightIcon, activeIcon: ChatBubbleLeftRightIconSolid },
     { name: "Connect Services", href: "/connect", icon: BoltIcon, activeIcon: BoltIconSolid },
 ];
 

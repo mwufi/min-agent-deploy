@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useAccounts } from "@/lib/hooks/use-pipedream";
+import { useAccounts, useDeployTrigger } from "@/lib/hooks/use-pipedream";
 import {
     EnvelopeIcon,
     Cog6ToothIcon,
@@ -50,6 +50,8 @@ export default function MailSetup({ userId }: { userId: string }) {
     const { data: accounts = [] } = useAccounts(userId);
     const [templates, setTemplates] = useState(mailTemplates);
     const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
+    const [deployedTriggers, setDeployedTriggers] = useState<Record<string, any>>({});
+    const deployTriggerMutation = useDeployTrigger();
 
     const gmailAccounts = accounts.filter(acc => acc.app.name_slug === "gmail");
 
@@ -61,6 +63,38 @@ export default function MailSetup({ userId }: { userId: string }) {
                     : template
             )
         );
+    };
+
+    const deployGmailTrigger = async (gmailAccountId: string) => {
+        try {
+            // Get the base URL for the webhook
+            const baseUrl = process.env.NODE_ENV === 'production'
+                ? window.location.origin
+                : 'http://localhost:3000'; // Fallback for development
+
+            const webhookUrl = `${baseUrl}/api/webhooks/gmail_email_received`;
+
+            const result = await deployTriggerMutation.mutateAsync({
+                externalUserId: userId,
+                componentId: "gmail-new-email-received",
+                configuredProps: {
+                    gmail: {
+                        authProvisionId: gmailAccountId
+                    }
+                },
+                webhookUrl: webhookUrl
+            });
+
+            // Store the deployed trigger info
+            setDeployedTriggers(prev => ({
+                ...prev,
+                [gmailAccountId]: result.data
+            }));
+
+            console.log("Gmail trigger deployed successfully for account:", gmailAccountId);
+        } catch (error) {
+            console.error("Failed to deploy Gmail trigger:", error);
+        }
     };
 
     if (gmailAccounts.length === 0) {
