@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import { ChevronDownIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import GmailTrigger from "./triggers/GmailTrigger";
