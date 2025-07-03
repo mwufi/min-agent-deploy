@@ -1,8 +1,8 @@
 <p align="center">
   <a href="https://go.clerk.com/e3UDpP4" target="_blank" rel="noopener noreferrer">
    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="../docs/light-logo.png">
-      <img src="../docs/dark-logo.png" height="64">
+      <source media="(prefers-color-scheme: dark)" srcset="./docs/light-logo.png">
+      <img src="./docs/dark-logo.png" height="64">
     </picture>
   </a>
   <br />
@@ -22,7 +22,7 @@
   </a>
   <br />
   <br />
-  <img alt="Hero Image" src=../docs/ara-header.png">
+  <img alt="Hero Image" src="docs/ara-header.png">
 </div>
 
 ## Introduction
