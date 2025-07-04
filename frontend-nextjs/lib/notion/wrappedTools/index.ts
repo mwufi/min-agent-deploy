@@ -8,16 +8,18 @@ export { createSmartNotionAssistant } from './smartNotionAssistant';
 // Re-export the main tools
 export { createNotionTools } from '../tools';
 
+import { createNotionTools } from '../tools';
+
 // Convenience function to create all Notion tools
 export function createAllNotionTools(userId: string, defaultAccountId?: string) {
-    const { createNotionTools } = require('../tools');
-    const { createSmartNotionAssistant } = require('./smartNotionAssistant');
-    
+    const tools = createNotionTools(userId, defaultAccountId);
     return {
-        // All standard tools
-        ...createNotionTools(userId, defaultAccountId),
-        
-        // Smart assistant
-        smartNotionAssistant: createSmartNotionAssistant(userId, defaultAccountId)
+        getNotionPage: tools.getNotionPage,
+        getNotionPageContent: tools.getNotionPageContent,
+        createNotionPage: tools.createNotionPage,
+        // findNotionDatabase: tools.findNotionDatabase,
+        // queryNotionDatabase: tools.queryNotionDatabase,
+        addNotionDatabaseRecord: tools.addNotionDatabaseRecord,
+        searchNotion: tools.searchNotion,
     };
 }

@@ -25,6 +25,16 @@ import {
   RemoveLabelByName,
   ListRecentThreadsEnhanced
 } from './GmailToolsEnhanced';
+import {
+  GetNotionPage,
+  GetNotionPageContent,
+  CreateNotionPage,
+  FindNotionDatabase,
+  QueryNotionDatabase,
+  AddNotionDatabaseRecord,
+  SearchNotion,
+  SmartNotionAssistant
+} from './NotionTools';
 import { PipedreamTools } from './PipedreamTools';
 import { Weather } from '../../weather';
 
@@ -88,6 +98,53 @@ export function ToolRenderer({ toolInvocation, showJson = {}, toggleJson }: Tool
         return <SmartCompose result={result} />;
       case 'quickReply':
         return <QuickReply result={result} />;
+      
+      // Notion tools
+      case 'getNotionPage':
+        return <GetNotionPage result={result} />;
+      case 'getNotionPageContent':
+        return <GetNotionPageContent result={result} />;
+      case 'createNotionPage':
+        return <CreateNotionPage result={result} />;
+      case 'updateNotionPage':
+        return <CreateNotionPage result={result} />; // Reuse create component
+      case 'getNotionSubPages':
+        return <QueryNotionDatabase result={result} />; // Similar display
+      case 'findNotionDatabase':
+        return <FindNotionDatabase result={result} />;
+      case 'queryNotionDatabase':
+        return <QueryNotionDatabase result={result} />;
+      case 'addNotionDatabaseRecord':
+        return <AddNotionDatabaseRecord result={result} />;
+      case 'getNotionDatabaseSchema':
+        return (
+          <div className="mb-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <h3 className="font-medium text-gray-900 mb-2">Database Schema</h3>
+            <div className="space-y-1">
+              {result.properties?.map((prop: any) => (
+                <div key={prop.id} className="text-sm">
+                  <span className="font-medium text-gray-700">{prop.name}</span>
+                  <span className="text-gray-500"> ({prop.type})</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      case 'searchNotion':
+        return <SearchNotion result={result} />;
+      case 'appendNotionBlocks':
+        return (
+          <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-center gap-2">
+              <span className="text-green-600">✅</span>
+              <p className="text-sm text-green-800">
+                {result.message || `Added ${result.blocksAdded} blocks successfully`}
+              </p>
+            </div>
+          </div>
+        );
+      case 'smartNotionAssistant':
+        return <SmartNotionAssistant result={result} />;
       
       // Pipedream tools
       case 'getConnectedServices':

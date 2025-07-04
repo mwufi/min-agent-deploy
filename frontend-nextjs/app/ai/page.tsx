@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import { MessageContent } from '../components/chat/MessageContent';
 import { ToolRenderer } from '../components/chat/tools/ToolRenderer';
 import { GmailAccountSelector } from '../components/chat/GmailAccountSelector';
+import { NotionAccountSelector } from '../components/chat/NotionAccountSelector';
 import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
 import { SparklesIcon } from '@heroicons/react/20/solid';
 
@@ -14,6 +15,8 @@ export default function Chat() {
   const { isLoaded, isSignedIn, user } = useUser();
   const [selectedGmailAccountId, setSelectedGmailAccountId] = useState<string | null>(null);
   const [selectedGmailAccountEmail, setSelectedGmailAccountEmail] = useState<string | null>(null);
+  const [selectedNotionAccountId, setSelectedNotionAccountId] = useState<string | null>(null);
+  const [selectedNotionAccountName, setSelectedNotionAccountName] = useState<string | null>(null);
 
   const { messages, input, handleInputChange, handleSubmit, addToolResult } = useChat({
     api: '/api/ai/chat',
@@ -21,6 +24,8 @@ export default function Chat() {
     body: {
       selectedGmailAccountId,
       selectedGmailAccountEmail,
+      selectedNotionAccountId,
+      selectedNotionAccountName,
     },
   });
 
@@ -44,9 +49,14 @@ export default function Chat() {
     setShowJson(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const handleAccountChange = useCallback((accountId: string | null, accountEmail: string | null) => {
+  const handleGmailAccountChange = useCallback((accountId: string | null, accountEmail: string | null) => {
     setSelectedGmailAccountId(accountId);
     setSelectedGmailAccountEmail(accountEmail);
+  }, []);
+
+  const handleNotionAccountChange = useCallback((accountId: string | null, accountName: string | null) => {
+    setSelectedNotionAccountId(accountId);
+    setSelectedNotionAccountName(accountName);
   }, []);
 
   const quickActions = [
@@ -75,11 +85,15 @@ export default function Chat() {
               </div>
             </div>
 
-            {/* Gmail Account Selector */}
+            {/* Account Selectors */}
             <div className="flex items-center gap-3">
               <GmailAccountSelector
                 selectedAccountId={selectedGmailAccountId}
-                onAccountChange={handleAccountChange}
+                onAccountChange={handleGmailAccountChange}
+              />
+              <NotionAccountSelector
+                selectedAccountId={selectedNotionAccountId}
+                onAccountChange={handleNotionAccountChange}
               />
             </div>
           </div>
