@@ -14,7 +14,7 @@ export default function Chat() {
   const { isLoaded, isSignedIn, user } = useUser();
   const [selectedGmailAccountId, setSelectedGmailAccountId] = useState<string | null>(null);
   const [selectedGmailAccountEmail, setSelectedGmailAccountEmail] = useState<string | null>(null);
-  
+
   const { messages, input, handleInputChange, handleSubmit, addToolResult } = useChat({
     api: '/api/ai/chat',
     maxSteps: 10,
@@ -74,7 +74,7 @@ export default function Chat() {
                 </p>
               </div>
             </div>
-            
+
             {/* Gmail Account Selector */}
             <div className="flex items-center gap-3">
               <GmailAccountSelector
@@ -96,7 +96,7 @@ export default function Chat() {
               </div>
               <h2 className="text-2xl font-semibold text-gray-900 mb-2">How can I help you today?</h2>
               <p className="text-gray-600 mb-2">I can assist with emails, connected services, and more.</p>
-              
+
               {selectedGmailAccountEmail && (
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full text-sm text-blue-700 mb-6">
                   <div className="w-5 h-5 bg-red-100 rounded-full flex items-center justify-center">
@@ -105,13 +105,13 @@ export default function Chat() {
                   <span>Working with: {selectedGmailAccountEmail}</span>
                 </div>
               )}
-              
+
               {selectedGmailAccountId === null && (
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-full text-sm text-gray-700 mb-6">
                   <span>Working with: All Gmail accounts</span>
                 </div>
               )}
-              
+
               {/* Quick Actions */}
               <div className="flex flex-wrap gap-2 justify-center">
                 {quickActions.map((action, idx) => (
@@ -130,11 +130,10 @@ export default function Chat() {
           {messages.map(message => (
             <div key={message.id} className="mb-6">
               <div className="flex items-start gap-3">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-medium flex-shrink-0 ${
-                  message.role === 'user'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-gradient-to-br from-blue-500 to-purple-600 text-white'
-                }`}>
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-medium flex-shrink-0 ${message.role === 'user'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-gradient-to-br from-blue-500 to-purple-600 text-white'
+                  }`}>
                   {message.role === 'user' ? '👤' : '✨'}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -142,11 +141,10 @@ export default function Chat() {
                     {message.role === 'user' ? 'You' : 'AI Assistant'}
                   </div>
 
-                  <div className={`rounded-lg ${
-                    message.role === 'user' 
-                      ? 'bg-blue-50 px-4 py-3' 
-                      : ''
-                  }`}>
+                  <div className={`rounded-lg ${message.role === 'user'
+                    ? 'bg-blue-50 px-4 py-3'
+                    : ''
+                    }`}>
                     {message.parts.map((part, index) => {
                       switch (part.type) {
                         case 'text':
@@ -161,13 +159,15 @@ export default function Chat() {
                         case 'tool-invocation':
                           return (
                             <div key={part.toolInvocation.toolCallId} className="my-4">
-                              <ToolRenderer 
-                                toolInvocation={part.toolInvocation} 
+                              <ToolRenderer
+                                toolInvocation={part.toolInvocation}
                                 showJson={showJson}
                                 toggleJson={toggleJson}
                               />
                             </div>
                           );
+                        case 'reasoning':
+                          return <div key={index} className="text-gray-700">{part.reasoning}</div>;
                       }
                     })}
                   </div>

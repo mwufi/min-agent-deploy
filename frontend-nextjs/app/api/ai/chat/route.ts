@@ -16,11 +16,11 @@ export async function POST(req: Request) {
 
   // Enhance messages with system context about selected Gmail account
   let contextualMessages = [...messages];
-  
+
   // Add system message about selected Gmail account if one is selected
   if (selectedGmailAccountEmail) {
     const gmailContext = `The user has selected the Gmail account "${selectedGmailAccountEmail}" (ID: ${selectedGmailAccountId}). When performing Gmail operations, use this account by default unless the user explicitly asks to use a different account or all accounts.`;
-    
+
     // Add as a system message at the beginning
     contextualMessages = [
       {
@@ -44,9 +44,9 @@ export async function POST(req: Request) {
   const userTools = createPipedreamTools(userId, selectedGmailAccountId || undefined);
 
   const result = streamText({
-    model: openai('gpt-4o'),
+    model: openai('gpt-4.1'),
     messages: contextualMessages,
-    maxSteps: 5, // Allow up to 5 steps for multi-step tool calling
+    maxSteps: 7, // Allow up to 5 steps for multi-step tool calling
     tools: userTools,
     onStepFinish({ text, toolCalls, toolResults, finishReason, usage }) {
       // Log each step for monitoring and debugging
@@ -54,6 +54,7 @@ export async function POST(req: Request) {
         text: text?.slice(0, 100) + (text && text.length > 100 ? '...' : ''),
         toolCallsCount: toolCalls?.length || 0,
         toolResultsCount: toolResults?.length || 0,
+        toolNames: toolCalls?.map(call => call.toolName) || [],
         finishReason,
         usage,
       });
