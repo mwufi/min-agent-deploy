@@ -1,7 +1,6 @@
 import { openai } from '@ai-sdk/openai';
 import { streamText } from 'ai';
 import { auth } from '@clerk/nextjs/server';
-import { createPipedreamTools } from '@/lib/ai/pipedream-tools';
 import { createGmailToolsEnhanced } from '@/lib/ai/gmail-tools-enhanced';
 import { createGmailTools } from '@/lib/ai/gmail-tools';
 import { createGmailComposeTool } from '@/lib/ai/gmail-compose-tool';
@@ -64,24 +63,22 @@ export async function POST(req: Request) {
   // Combine system messages with user messages
   const contextualMessages = [...systemMessages, ...messages];
 
-  // Create all tool sets
-  const pipedreamTools = createPipedreamTools(userId, selectedGmailAccountId || undefined);
-  const enhancedGmailTools = createGmailToolsEnhanced(userId, selectedGmailAccountId || undefined);
-  const originalGmailTools = createGmailTools(userId, selectedGmailAccountId || undefined);
+  // Create enhanced Gmail tools
+  const enhancedTools = createGmailToolsEnhanced(userId, selectedGmailAccountId || undefined);
+  const originalTools = createGmailTools(userId, selectedGmailAccountId || undefined);
   const composeTools = createGmailComposeTool(userId, selectedGmailAccountId || undefined);
 
-  // Combine all tools, with enhanced tools taking precedence
+  // Combine all tools
   const allTools = {
-    ...pipedreamTools,
-    ...originalGmailTools,
-    ...composeTools,
-    ...enhancedGmailTools, // Enhanced tools override originals where there's overlap
+    ...enhancedTools,
+    ...originalTools,
+    ...composeTools
   };
 
   const result = streamText({
     model: openai('gpt-4o'),
     messages: contextualMessages,
-    maxSteps: 10, // Increased for persistence
+    maxSteps: 10, // Allow more steps for persistence
     tools: allTools,
     onStepFinish({ text, toolCalls, toolResults, finishReason, usage }) {
       // Log each step for monitoring and debugging

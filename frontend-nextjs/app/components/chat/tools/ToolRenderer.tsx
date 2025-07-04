@@ -18,6 +18,13 @@ import {
   SmartCompose,
   QuickReply
 } from './GmailTools';
+import {
+  FindEmailsByLabel,
+  SearchEmailsSmartly,
+  AddLabelByName,
+  RemoveLabelByName,
+  ListRecentThreadsEnhanced
+} from './GmailToolsEnhanced';
 import { PipedreamTools } from './PipedreamTools';
 import { Weather } from '../../weather';
 
@@ -38,9 +45,21 @@ export function ToolRenderer({ toolInvocation, showJson = {}, toggleJson }: Tool
   // Show results
   if (state === 'result') {
     switch (toolName) {
+      // Enhanced Gmail tools
+      case 'findEmailsByLabel':
+        return <FindEmailsByLabel result={result} />;
+      case 'searchEmailsSmartly':
+        return <SearchEmailsSmartly result={result} />;
+      case 'addLabelByName':
+        return <AddLabelByName result={result} />;
+      case 'removeLabelByName':
+        return <RemoveLabelByName result={result} />;
+      
       // Gmail tools
       case 'listRecentThreads':
-        return <ListRecentThreads result={result} />;
+        return result.error || result.suggestions ? 
+          <ListRecentThreadsEnhanced result={result} /> : 
+          <ListRecentThreads result={result} />;
       case 'viewThreadDetails':
         return <ViewThreadDetails result={result} />;
       case 'findEmails':
