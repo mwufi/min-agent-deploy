@@ -346,6 +346,15 @@ export const createGmailTools = (userId: string) => ({
                 const cc = getHeader('cc');
                 const subject = getHeader('subject');
                 const messageId = getHeader('message-id');
+                const existingReferences = getHeader('references');
+                
+                // Build proper References header chain
+                let references = existingReferences;
+                if (messageId) {
+                    references = existingReferences 
+                        ? `${existingReferences} ${messageId}` 
+                        : messageId;
+                }
                 
                 let recipients = from;
                 let ccRecipients = '';
@@ -356,7 +365,9 @@ export const createGmailTools = (userId: string) => ({
                     ccRecipients = cc;
                 }
                 
-                const replySubject = subject.startsWith('Re:') ? subject : `Re: ${subject}`;
+                const replySubject = subject.startsWith('Re:') || subject.startsWith('RE:') 
+                    ? subject 
+                    : `Re: ${subject}`;
                 
                 const result = await sendMessage(
                     userId,
@@ -367,7 +378,7 @@ export const createGmailTools = (userId: string) => ({
                         body,
                         threadId,
                         inReplyTo: messageId,
-                        references: messageId
+                        references: references
                     },
                     accountId
                 );

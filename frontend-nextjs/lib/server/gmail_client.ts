@@ -229,16 +229,40 @@ export const sendMessage = async (
     },
     accountId?: string
 ) => {
-    const email = [
+    // Build proper MIME message
+    const boundary = `----=_NextPart_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+    
+    const headers = [
         `To: ${message.to}`,
         message.cc ? `Cc: ${message.cc}` : '',
         message.bcc ? `Bcc: ${message.bcc}` : '',
         `Subject: ${message.subject}`,
+        `MIME-Version: 1.0`,
+        `Content-Type: multipart/alternative; boundary="${boundary}"`,
         message.inReplyTo ? `In-Reply-To: ${message.inReplyTo}` : '',
         message.references ? `References: ${message.references}` : '',
+    ].filter(Boolean);
+
+    // Build message parts
+    const messageParts = [
+        ...headers,
+        '', // Empty line between headers and body
+        `--${boundary}`,
+        'Content-Type: text/plain; charset="UTF-8"',
+        'Content-Transfer-Encoding: 7bit',
         '',
-        message.body
-    ].filter(Boolean).join('\r\n');
+        message.body,
+        '',
+        `--${boundary}`,
+        'Content-Type: text/html; charset="UTF-8"',
+        'Content-Transfer-Encoding: 7bit',
+        '',
+        message.body.replace(/\n/g, '<br>'), // Simple HTML conversion
+        '',
+        `--${boundary}--`
+    ];
+
+    const email = messageParts.join('\r\n');
 
     const encodedMessage = Buffer.from(email)
         .toString('base64')
@@ -275,14 +299,38 @@ export const createDraft = async (
     },
     accountId?: string
 ) => {
-    const email = [
+    // Build proper MIME message
+    const boundary = `----=_NextPart_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+    
+    const headers = [
         `To: ${draft.to}`,
         draft.cc ? `Cc: ${draft.cc}` : '',
         draft.bcc ? `Bcc: ${draft.bcc}` : '',
         `Subject: ${draft.subject}`,
+        `MIME-Version: 1.0`,
+        `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    ].filter(Boolean);
+
+    // Build message parts
+    const messageParts = [
+        ...headers,
+        '', // Empty line between headers and body
+        `--${boundary}`,
+        'Content-Type: text/plain; charset="UTF-8"',
+        'Content-Transfer-Encoding: 7bit',
         '',
-        draft.body
-    ].filter(Boolean).join('\r\n');
+        draft.body,
+        '',
+        `--${boundary}`,
+        'Content-Type: text/html; charset="UTF-8"',
+        'Content-Transfer-Encoding: 7bit',
+        '',
+        draft.body.replace(/\n/g, '<br>'), // Simple HTML conversion
+        '',
+        `--${boundary}--`
+    ];
+
+    const email = messageParts.join('\r\n');
 
     const encodedMessage = Buffer.from(email)
         .toString('base64')
