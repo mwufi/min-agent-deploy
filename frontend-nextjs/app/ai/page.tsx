@@ -8,7 +8,7 @@ import { redirect } from 'next/navigation';
 export default function Chat() {
   const { isLoaded, isSignedIn, user } = useUser();
   const { messages, input, handleInputChange, handleSubmit, addToolResult } = useChat({
-    api: '/api/ai/chat',
+    api: 'http://127.0.0.1:8000/api/chat',
     maxSteps: 10,
   });
 

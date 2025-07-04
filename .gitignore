@@ -1,2 +1,5 @@
 **/*.env
 **/dev-data
+
+# python stuff
+**/__pycache__
