@@ -9,7 +9,7 @@ import { Weather } from '../components/weather';
 export default function Chat() {
   const { isLoaded, isSignedIn, user } = useUser();
   const { messages, input, handleInputChange, handleSubmit, addToolResult } = useChat({
-    api: 'http://127.0.0.1:8000/api/chat',
+    api: '/api/ai/chat',
     maxSteps: 10,
   });
 
@@ -37,7 +37,8 @@ export default function Chat() {
     const icons = {
       getConnectedServices: '🔗',
       getConnectionDetails: '🔍',
-      searchForPipedreamApps: '🔎'
+      searchForPipedreamApps: '🔎',
+      getGmailMessages: '📧'
     };
 
     return (
@@ -289,8 +290,43 @@ export default function Chat() {
                         break;
                       }
 
+                      case 'getGmailMessages': {
+                        switch (part.toolInvocation.state) {
+                          case 'call':
+                            return <div key={callId} className="mb-4">{renderLoadingState('getGmailMessages', part.toolInvocation.args)}</div>;
+                          case 'result':
+                            const messages = part.toolInvocation.result as any;
+                            return (
+                              <div key={callId} className="mb-4">
+                                <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                                  📧 Gmail Messages ({messages?.length || 0})
+                                </h3>
+                                {messages?.length > 0 ? (
+                                  <div className="grid gap-4 md:grid-cols-2">
+                                    {messages.map((message: any) => (
+                                      <div key={message.id} className="border border-gray-200 rounded-lg p-4 bg-white hover:shadow-md transition-shadow">
+                                        <div className="flex items-start gap-3 mb-3">
+                                          <div className="flex-1 min-w-0">
+                                            <h4 className="font-medium text-gray-900 truncate">{message.subject}</h4>
+                                            <p className="text-sm text-gray-500">{message.from}</p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="text-center py-8 bg-gray-50 border border-gray-200 rounded-lg">
+                                    <div className="text-gray-400 text-4xl mb-2">📧</div>
+                                    <p className="text-gray-600">No messages found</p>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                        }
+                        break;
+                      }
                       default:
-                        return null;
+                        return <div>Used tool: {part.toolInvocation.toolName}</div>;
                     }
                   }
                 }

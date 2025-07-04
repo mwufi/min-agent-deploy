@@ -1,9 +1,11 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import pd from '@/lib/server/pipedream_client';
+import { createGmailTools } from './gmail-tools';
 
 // Factory function to create tools with userId context
 export const createPipedreamTools = (userId: string) => ({
+    ...createGmailTools(userId),
     getConnectedServices: tool({
         description: 'Get a list of connected Pipedream services for the current user',
         parameters: z.object({}),
