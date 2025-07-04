@@ -4,6 +4,7 @@ import { useChat } from '@ai-sdk/react';
 import { useUser } from '@clerk/nextjs';
 import { useState } from 'react';
 import { redirect } from 'next/navigation';
+import { Weather } from '../components/weather';
 
 export default function Chat() {
   const { isLoaded, isSignedIn, user } = useUser();
@@ -272,12 +273,26 @@ export default function Chat() {
                         }
                         break;
                       }
-                    }
-                    return null;
-                  }
 
-                  default:
-                    return null;
+                      case 'get_current_weather': {
+                        switch (part.toolInvocation.state) {
+                          case 'call':
+                            return <div key={callId} className="mb-4">{renderLoadingState('get_current_weather', part.toolInvocation.args)}</div>;
+                          case 'result':
+                            const weather = part.toolInvocation.result as any;
+                            return (
+                              <div key={callId} className="mb-4">
+                                <Weather weatherAtLocation={weather} />
+                              </div>
+                            );
+                        }
+                        break;
+                      }
+
+                      default:
+                        return null;
+                    }
+                  }
                 }
               })}
             </div>
