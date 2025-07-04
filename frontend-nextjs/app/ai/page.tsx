@@ -281,7 +281,7 @@ export default function Chat() {
                           case 'result':
                             const weather = part.toolInvocation.result as any;
                             return (
-                              <div key={callId} className="mb-4">
+                              <div key={callId} className="my-4">
                                 <Weather weatherAtLocation={weather} />
                               </div>
                             );
