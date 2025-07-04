@@ -32,6 +32,11 @@ interface GmailMessage {
     internalDate?: string;
 }
 
+interface GmailDraft {
+    id: string;
+    message?: GmailMessage;
+}
+
 interface GmailThread {
     id: string;
     messages?: GmailMessage[];
@@ -48,12 +53,12 @@ async function getGmailAccounts(userId: string): Promise<GmailAccount[]> {
     return gmailAccounts;
 }
 
-async function makeGmailRequest(
+async function makeGmailRequest<T = any>(
     userId: string,
     endpoint: string,
     options: any = {},
     accountId?: string
-) {
+): Promise<T> {
     const gmailAccounts = await getGmailAccounts(userId);
     if (gmailAccounts.length === 0) {
         throw new Error('No Gmail accounts found');
@@ -79,7 +84,11 @@ async function makeGmailRequest(
             }
         );
 
-        return response;
+        // Parse response if it's a string
+        if (typeof response === 'string') {
+            return JSON.parse(response) as T;
+        }
+        return response as T;
     } catch (error) {
         console.error("error", error);
         throw error;
@@ -228,7 +237,7 @@ export const sendMessage = async (
         references?: string;
     },
     accountId?: string
-) => {
+): Promise<GmailMessage> => {
     // Build proper MIME message
     const boundary = `----=_NextPart_${Date.now()}_${Math.random().toString(36).substring(2)}`;
     
@@ -275,7 +284,7 @@ export const sendMessage = async (
         body.threadId = message.threadId;
     }
 
-    return makeGmailRequest(
+    return makeGmailRequest<GmailMessage>(
         userId,
         '/messages/send',
         {
@@ -298,7 +307,7 @@ export const createDraft = async (
         threadId?: string;
     },
     accountId?: string
-) => {
+): Promise<GmailDraft> => {
     // Build proper MIME message
     const boundary = `----=_NextPart_${Date.now()}_${Math.random().toString(36).substring(2)}`;
     
@@ -345,7 +354,7 @@ export const createDraft = async (
         body.message.threadId = draft.threadId;
     }
 
-    return makeGmailRequest(
+    return makeGmailRequest<GmailDraft>(
         userId,
         '/drafts',
         {
