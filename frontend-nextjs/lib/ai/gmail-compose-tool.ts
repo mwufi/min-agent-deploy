@@ -2,7 +2,11 @@ import { tool } from "ai";
 import { z } from "zod";
 import { sendMessage, createDraft } from "../server/gmail_client";
 
-export const createGmailComposeTool = (userId: string) => ({
+function findContactByName(userId: string, recipientName: string) {
+  return "test@test.com";
+}
+
+export const createGmailComposeTool = (userId: string, defaultAccountId?: string) => ({
   smartCompose: tool({
     description: 'Intelligently compose and send an email. Can look up contacts by name and help draft messages.',
     parameters: z.object({
@@ -18,18 +22,11 @@ export const createGmailComposeTool = (userId: string) => ({
       try {
         // Determine recipient email
         let finalRecipientEmail = recipientEmail;
-        
+
         if (!finalRecipientEmail && recipientName) {
-          const aggregator = await import('./gmail-aggregator').then(m => m.createGmailAggregatorTools(userId));
-          const contactResult = await aggregator.findContactByName(recipientName);
-          
-          if (contactResult.contacts.length === 0) {
-            throw new Error(`No contact found with name "${recipientName}"`);
-          }
-          
-          finalRecipientEmail = contactResult.contacts[0].email;
+          finalRecipientEmail = findContactByName(userId, recipientName);
         }
-        
+
         if (!finalRecipientEmail) {
           throw new Error('No recipient email address provided');
         }
@@ -45,7 +42,7 @@ export const createGmailComposeTool = (userId: string) => ({
 
         // Compose the email body
         let body = '';
-        
+
         // Opening based on tone
         switch (tone) {
           case 'professional':
@@ -104,9 +101,10 @@ export const createGmailComposeTool = (userId: string) => ({
               subject,
               body
             },
-            accountId
+            accountId || defaultAccountId
           );
-          
+          console.log("result of sendMessage", result);
+
           return {
             success: true,
             action: 'sent',
@@ -124,9 +122,9 @@ export const createGmailComposeTool = (userId: string) => ({
               subject,
               body
             },
-            accountId
+            accountId || defaultAccountId
           );
-          
+
           return {
             success: true,
             action: 'drafted',
@@ -160,15 +158,8 @@ export const createGmailComposeTool = (userId: string) => ({
     }),
     execute: async ({ recipientName, template, customMessage, accountId }) => {
       try {
-        const aggregator = await import('./gmail-aggregator').then(m => m.createGmailAggregatorTools(userId));
-        const contactResult = await aggregator.findContactByName(recipientName);
-        
-        if (contactResult.contacts.length === 0) {
-          throw new Error(`No contact found with name "${recipientName}"`);
-        }
-        
-        const recipientEmail = contactResult.contacts[0].email;
-        
+        const recipientEmail = findContactByName(userId, recipientName);
+
         // Template messages
         const templates = {
           acknowledge: {
@@ -200,14 +191,14 @@ export const createGmailComposeTool = (userId: string) => ({
             body: 'Hi,\n\nI\'m currently out of office and will return on [date]. I\'ll respond to your message as soon as possible upon my return.\n\nFor urgent matters, please contact [alternative contact].\n\nBest regards,'
           }
         };
-        
+
         const selectedTemplate = templates[template];
         let finalBody = selectedTemplate.body;
-        
+
         if (customMessage) {
           finalBody = finalBody.replace('Best regards,', `${customMessage}\n\nBest regards,`);
         }
-        
+
         const result = await sendMessage(
           userId,
           {
@@ -215,9 +206,9 @@ export const createGmailComposeTool = (userId: string) => ({
             subject: selectedTemplate.subject,
             body: finalBody
           },
-          accountId
+          accountId || defaultAccountId
         );
-        
+
         return {
           success: true,
           messageId: result.id,

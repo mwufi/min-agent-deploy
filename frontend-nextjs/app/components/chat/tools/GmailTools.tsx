@@ -398,29 +398,144 @@ export function MarkAsRead({ result }: { result: any }) {
 }
 
 export function DraftMessage({ result }: { result: any }) {
+  const openInGmail = () => {
+    // Open Gmail in compose mode with the draft
+    window.open('https://mail.google.com/mail/u/0/#drafts', '_blank');
+  };
+
   return (
-    <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-      <div className="flex items-center gap-2">
-        <span className="text-yellow-600">📝</span>
-        <p className="text-sm text-yellow-800">
-          Draft created successfully (ID: {result.draftId})
-        </p>
+    <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg overflow-hidden">
+      <div className="p-4">
+        <div className="flex items-start justify-between">
+          <div className="flex items-start gap-3">
+            <span className="text-yellow-600 text-xl">📝</span>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-yellow-800 mb-2">
+                Draft created successfully
+              </p>
+              
+              {/* Draft details */}
+              <div className="bg-white rounded-md p-3 border border-yellow-100 space-y-2">
+                {result.to && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs font-medium text-gray-500 w-12">To:</span>
+                    <span className="text-sm text-gray-700">{result.to}</span>
+                  </div>
+                )}
+                {result.cc && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs font-medium text-gray-500 w-12">Cc:</span>
+                    <span className="text-sm text-gray-700">{result.cc}</span>
+                  </div>
+                )}
+                {result.subject && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs font-medium text-gray-500 w-12">Subject:</span>
+                    <span className="text-sm text-gray-700 font-medium">{result.subject}</span>
+                  </div>
+                )}
+                {result.accountEmail && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs font-medium text-gray-500 w-12">From:</span>
+                    <span className="text-sm text-gray-700">{result.accountEmail}</span>
+                  </div>
+                )}
+                {result.preview && (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <p className="text-xs font-medium text-gray-500 mb-1">Preview:</p>
+                    <p className="text-sm text-gray-600 line-clamp-3">{result.preview}</p>
+                  </div>
+                )}
+              </div>
+              
+              <div className="mt-3 flex items-center gap-3">
+                <button
+                  onClick={openInGmail}
+                  className="text-sm text-yellow-700 hover:text-yellow-800 font-medium flex items-center gap-1"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  Open in Gmail
+                </button>
+                <span className="text-xs text-gray-500">
+                  Draft ID: {result.draftId}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
 export function SendEmail({ result }: { result: any }) {
+  const openInGmail = () => {
+    // Open Gmail in sent folder
+    window.open('https://mail.google.com/mail/u/0/#sent', '_blank');
+  };
+
   return (
-    <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-4">
-      <div className="flex items-center gap-2">
-        <span className="text-green-600">📤</span>
-        <p className="text-sm text-green-800">
-          Email sent successfully!
-        </p>
-        <p className="text-xs text-green-600">
-          Message ID: {result.messageId}
-        </p>
+    <div className="mb-4 bg-green-50 border border-green-200 rounded-lg overflow-hidden">
+      <div className="p-4">
+        <div className="flex items-start gap-3">
+          <span className="text-green-600 text-xl">📤</span>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-green-800 mb-2">
+              Email sent successfully!
+            </p>
+            
+            {/* Email details */}
+            <div className="bg-white rounded-md p-3 border border-green-100 space-y-2">
+              {result.to && (
+                <div className="flex items-start gap-2">
+                  <span className="text-xs font-medium text-gray-500 w-12">To:</span>
+                  <span className="text-sm text-gray-700">{result.to}</span>
+                </div>
+              )}
+              {result.cc && (
+                <div className="flex items-start gap-2">
+                  <span className="text-xs font-medium text-gray-500 w-12">Cc:</span>
+                  <span className="text-sm text-gray-700">{result.cc}</span>
+                </div>
+              )}
+              {result.subject && (
+                <div className="flex items-start gap-2">
+                  <span className="text-xs font-medium text-gray-500 w-12">Subject:</span>
+                  <span className="text-sm text-gray-700 font-medium">{result.subject}</span>
+                </div>
+              )}
+              {result.accountEmail && (
+                <div className="flex items-start gap-2">
+                  <span className="text-xs font-medium text-gray-500 w-12">From:</span>
+                  <span className="text-sm text-gray-700">{result.accountEmail}</span>
+                </div>
+              )}
+              {result.preview && (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <p className="text-xs font-medium text-gray-500 mb-1">Message:</p>
+                  <p className="text-sm text-gray-600 line-clamp-3">{result.preview}</p>
+                </div>
+              )}
+            </div>
+            
+            <div className="mt-3 flex items-center gap-3">
+              <button
+                onClick={openInGmail}
+                className="text-sm text-green-700 hover:text-green-800 font-medium flex items-center gap-1"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                View in Gmail
+              </button>
+              <span className="text-xs text-gray-500">
+                Message ID: {result.messageId}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
