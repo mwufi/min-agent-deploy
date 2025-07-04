@@ -14,7 +14,9 @@ import {
   ForwardEmail,
   ListGmailAccounts,
   ListLabels,
-  AddLabel
+  AddLabel,
+  SmartCompose,
+  QuickReply
 } from './GmailTools';
 import { PipedreamTools } from './PipedreamTools';
 import { Weather } from '../../weather';
@@ -63,6 +65,10 @@ export function ToolRenderer({ toolInvocation, showJson = {}, toggleJson }: Tool
         return <ListLabels result={result} />;
       case 'addLabel':
         return <AddLabel result={result} />;
+      case 'smartCompose':
+        return <SmartCompose result={result} />;
+      case 'quickReply':
+        return <QuickReply result={result} />;
       
       // Pipedream tools
       case 'getConnectedServices':

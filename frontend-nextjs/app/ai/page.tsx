@@ -2,18 +2,26 @@
 
 import { useChat } from '@ai-sdk/react';
 import { useUser } from '@clerk/nextjs';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { redirect } from 'next/navigation';
 import { MessageContent } from '../components/chat/MessageContent';
 import { ToolRenderer } from '../components/chat/tools/ToolRenderer';
+import { GmailAccountSelector } from '../components/chat/GmailAccountSelector';
 import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
 import { SparklesIcon } from '@heroicons/react/20/solid';
 
 export default function Chat() {
   const { isLoaded, isSignedIn, user } = useUser();
+  const [selectedGmailAccountId, setSelectedGmailAccountId] = useState<string | null>(null);
+  const [selectedGmailAccountEmail, setSelectedGmailAccountEmail] = useState<string | null>(null);
+  
   const { messages, input, handleInputChange, handleSubmit, addToolResult } = useChat({
     api: '/api/ai/chat',
     maxSteps: 10,
+    body: {
+      selectedGmailAccountId,
+      selectedGmailAccountEmail,
+    },
   });
 
   const [showJson, setShowJson] = useState<Record<string, boolean>>({});
@@ -36,6 +44,11 @@ export default function Chat() {
     setShowJson(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const handleAccountChange = useCallback((accountId: string | null, accountEmail: string | null) => {
+    setSelectedGmailAccountId(accountId);
+    setSelectedGmailAccountEmail(accountEmail);
+  }, []);
+
   const quickActions = [
     { label: "📧 Recent emails", prompt: "Show me my recent emails" },
     { label: "🔍 Search emails", prompt: "Search for unread emails" },
@@ -49,15 +62,25 @@ export default function Chat() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-4xl mx-auto">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-              <SparklesIcon className="w-6 h-6 text-white" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                <SparklesIcon className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">AI Assistant</h1>
+                <p className="text-sm text-gray-600">
+                  Hi {user?.firstName || 'there'}! I can help with emails, services, and more.
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">AI Assistant</h1>
-              <p className="text-sm text-gray-600">
-                Hi {user?.firstName || 'there'}! I can help with emails, services, and more.
-              </p>
+            
+            {/* Gmail Account Selector */}
+            <div className="flex items-center gap-3">
+              <GmailAccountSelector
+                selectedAccountId={selectedGmailAccountId}
+                onAccountChange={handleAccountChange}
+              />
             </div>
           </div>
         </div>
@@ -72,7 +95,22 @@ export default function Chat() {
                 <SparklesIcon className="w-10 h-10 text-blue-600" />
               </div>
               <h2 className="text-2xl font-semibold text-gray-900 mb-2">How can I help you today?</h2>
-              <p className="text-gray-600 mb-8">I can assist with emails, connected services, and more.</p>
+              <p className="text-gray-600 mb-2">I can assist with emails, connected services, and more.</p>
+              
+              {selectedGmailAccountEmail && (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full text-sm text-blue-700 mb-6">
+                  <div className="w-5 h-5 bg-red-100 rounded-full flex items-center justify-center">
+                    <span className="text-red-600 text-xs font-medium">G</span>
+                  </div>
+                  <span>Working with: {selectedGmailAccountEmail}</span>
+                </div>
+              )}
+              
+              {selectedGmailAccountId === null && (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-full text-sm text-gray-700 mb-6">
+                  <span>Working with: All Gmail accounts</span>
+                </div>
+              )}
               
               {/* Quick Actions */}
               <div className="flex flex-wrap gap-2 justify-center">

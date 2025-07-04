@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/20/solid';
+import { useState, useCallback } from 'react';
+import { ChevronDownIcon, ChevronRightIcon, PaperAirplaneIcon, XMarkIcon } from '@heroicons/react/20/solid';
 
 interface EmailThread {
   id: string;
@@ -111,8 +111,11 @@ export function ListRecentThreads({ result }: { result: any }) {
   );
 }
 
-export function ViewThreadDetails({ result }: { result: any }) {
+export function ViewThreadDetails({ result, onReply }: { result: any; onReply?: (threadId: string, replyTo: string, subject: string) => void }) {
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [isReplying, setIsReplying] = useState(false);
   const messages = result.messages || [];
 
   const toggleMessage = (messageId: string) => {
@@ -124,6 +127,40 @@ export function ViewThreadDetails({ result }: { result: any }) {
     }
     setExpandedMessages(newExpanded);
   };
+
+  const handleReply = useCallback((message: EmailMessage) => {
+    setReplyingTo(message.id);
+    setReplyText('');
+  }, []);
+
+  const sendReply = useCallback(() => {
+    if (!replyText.trim() || !replyingTo) return;
+    
+    const message = messages.find((m: EmailMessage) => m.id === replyingTo);
+    if (!message) return;
+
+    setIsReplying(true);
+    
+    // Call the onReply callback if provided
+    if (onReply) {
+      onReply(result.id, message.from, message.subject);
+    }
+    
+    // Show success state
+    setTimeout(() => {
+      setReplyingTo(null);
+      setReplyText('');
+      setIsReplying(false);
+    }, 1000);
+  }, [replyText, replyingTo, messages, result.id, onReply]);
+
+  const quickReplies = [
+    "Thanks for your email, I'll get back to you soon.",
+    "Got it, thanks!",
+    "I'll look into this and let you know.",
+    "Sounds good to me.",
+    "Let me check and get back to you."
+  ];
 
   return (
     <div className="mb-4">
@@ -166,8 +203,23 @@ export function ViewThreadDetails({ result }: { result: any }) {
                   </div>
                 </div>
                 <div className="mt-3 pt-3 border-t border-gray-200">
-                  <p className="text-xs text-gray-500">Date: {message.date}</p>
-                  <p className="text-xs text-gray-500">Message ID: {message.id}</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-500">Date: {message.date}</p>
+                      <p className="text-xs text-gray-500">Message ID: {message.id}</p>
+                    </div>
+                    {idx === messages.length - 1 && (
+                      <button
+                        onClick={() => handleReply(message)}
+                        className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                        </svg>
+                        Reply
+                      </button>
+                    )}
+                  </div>
                   {message.labels.length > 0 && (
                     <div className="flex gap-1 mt-2">
                       {message.labels.map((label) => (
@@ -178,10 +230,89 @@ export function ViewThreadDetails({ result }: { result: any }) {
                     </div>
                   )}
                 </div>
+
+                {/* Reply Form */}
+                {replyingTo === message.id && (
+                  <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-medium text-gray-900">Reply to {message.from}</h4>
+                      <button
+                        onClick={() => setReplyingTo(null)}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        <XMarkIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                    
+                    {/* Quick replies */}
+                    <div className="mb-3">
+                      <p className="text-xs text-gray-500 mb-2">Quick replies:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {quickReplies.map((reply, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => setReplyText(reply)}
+                            className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded transition-colors"
+                          >
+                            {reply}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <textarea
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      placeholder="Type your reply..."
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                      rows={4}
+                    />
+                    
+                    <div className="flex justify-end gap-2 mt-3">
+                      <button
+                        onClick={() => setReplyingTo(null)}
+                        className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900"
+                        disabled={isReplying}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={sendReply}
+                        disabled={!replyText.trim() || isReplying}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-medium flex items-center gap-2"
+                      >
+                        {isReplying ? (
+                          <>
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <PaperAirplaneIcon className="w-4 h-4" />
+                            Send Reply
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
         ))}
+      </div>
+      
+      {/* Thread-level reply button */}
+      <div className="mt-4 flex justify-center">
+        <button
+          onClick={() => messages.length > 0 && handleReply(messages[messages.length - 1])}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+          </svg>
+          Reply to Thread
+        </button>
       </div>
     </div>
   );
@@ -415,6 +546,82 @@ export function AddLabel({ result }: { result: any }) {
               {label}
             </span>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function SmartCompose({ result }: { result: any }) {
+  const actionIcon = result.action === 'sent' ? '📤' : '📝';
+  const actionColor = result.action === 'sent' ? 'green' : 'yellow';
+  
+  return (
+    <div className={`mb-4 bg-${actionColor}-50 border border-${actionColor}-200 rounded-lg p-4`}>
+      <div className="flex items-start gap-3">
+        <span className={`text-${actionColor}-600 text-xl`}>{actionIcon}</span>
+        <div className="flex-1">
+          <p className={`text-sm font-medium text-${actionColor}-800`}>
+            Email {result.action === 'sent' ? 'sent' : 'drafted'} successfully!
+          </p>
+          <div className="mt-2 space-y-1">
+            <p className="text-sm text-gray-700">
+              <span className="font-medium">To:</span> {result.recipient}
+            </p>
+            <p className="text-sm text-gray-700">
+              <span className="font-medium">Subject:</span> {result.subject}
+            </p>
+            <div className="mt-2 p-2 bg-white rounded border border-gray-200">
+              <p className="text-xs text-gray-500 mb-1">Preview:</p>
+              <p className="text-sm text-gray-700">{result.preview}</p>
+            </div>
+          </div>
+          {result.action === 'sent' && (
+            <p className="text-xs text-gray-500 mt-2">
+              Message ID: {result.messageId}
+            </p>
+          )}
+          {result.action === 'drafted' && (
+            <p className="text-xs text-gray-500 mt-2">
+              Draft ID: {result.draftId}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function QuickReply({ result }: { result: any }) {
+  const templateNames = {
+    acknowledge: 'Acknowledgment',
+    schedule_meeting: 'Meeting Request',
+    need_more_info: 'Information Request',
+    will_review: 'Will Review',
+    approved: 'Approval',
+    declined: 'Declined',
+    out_of_office: 'Out of Office'
+  };
+  
+  return (
+    <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-4">
+      <div className="flex items-start gap-3">
+        <span className="text-green-600 text-xl">⚡</span>
+        <div className="flex-1">
+          <p className="text-sm font-medium text-green-800">
+            Quick reply sent successfully!
+          </p>
+          <div className="mt-2 space-y-1">
+            <p className="text-sm text-gray-700">
+              <span className="font-medium">To:</span> {result.recipient}
+            </p>
+            <p className="text-sm text-gray-700">
+              <span className="font-medium">Template:</span> {templateNames[result.template as keyof typeof templateNames]}
+            </p>
+          </div>
+          <p className="text-xs text-gray-500 mt-2">
+            Message ID: {result.messageId}
+          </p>
         </div>
       </div>
     </div>
