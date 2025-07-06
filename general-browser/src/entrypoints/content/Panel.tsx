@@ -52,17 +52,24 @@ export const Panel: React.FC<PanelProps> = ({ isOpen, onClose, messages, onMessa
           <motion.div
             layout
             transition={{ layout: { duration: 0.3 } }}
-            className="backdrop-blur-xl bg-white/80 dark:bg-gray-900/80 rounded-2xl shadow-2xl border border-white/20 dark:border-gray-700/30 overflow-hidden"
+            className="relative backdrop-blur-md bg-white/10 dark:bg-gray-900/10 rounded-2xl shadow-2xl border border-white/20 dark:border-gray-700/30 overflow-hidden"
           >
+            {/* Decorative blurred ellipses */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              <div className="absolute -top-24 -left-24 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl" />
+              <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-pink-500/20 rounded-full blur-3xl" />
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl" />
+            </div>
+            
             {/* Header with tabs */}
-            <div className="border-b border-gray-200/20 dark:border-gray-700/20 backdrop-blur-sm bg-white/50 dark:bg-gray-800/50">
+            <div className="relative border-b border-gray-200/10 dark:border-gray-700/20 backdrop-blur-sm bg-transparent">
               <div className="flex items-center justify-between p-4">
                 <div className="flex space-x-1">
                   <button
                     onClick={() => setActiveTab('chats')}
                     className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${activeTab === 'chats'
-                        ? 'bg-purple-500/20 text-purple-600 dark:text-purple-400'
-                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-gray-700/50'
+                        ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-600 dark:text-purple-400 backdrop-blur-sm'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-white/20 dark:hover:bg-gray-700/20'
                       }`}
                   >
                     Chats
@@ -70,8 +77,8 @@ export const Panel: React.FC<PanelProps> = ({ isOpen, onClose, messages, onMessa
                   <button
                     onClick={() => setActiveTab('memory')}
                     className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${activeTab === 'memory'
-                        ? 'bg-purple-500/20 text-purple-600 dark:text-purple-400'
-                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-gray-700/50'
+                        ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-600 dark:text-purple-400 backdrop-blur-sm'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-white/20 dark:hover:bg-gray-700/20'
                       }`}
                   >
                     Memory
@@ -79,8 +86,8 @@ export const Panel: React.FC<PanelProps> = ({ isOpen, onClose, messages, onMessa
                   <button
                     onClick={() => setActiveTab('settings')}
                     className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${activeTab === 'settings'
-                        ? 'bg-purple-500/20 text-purple-600 dark:text-purple-400'
-                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-gray-700/50'
+                        ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-600 dark:text-purple-400 backdrop-blur-sm'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-white/20 dark:hover:bg-gray-700/20'
                       }`}
                   >
                     Settings
@@ -88,7 +95,7 @@ export const Panel: React.FC<PanelProps> = ({ isOpen, onClose, messages, onMessa
                 </div>
                 <button
                   onClick={onClose}
-                  className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-200/50 dark:hover:bg-gray-700/50 rounded-lg transition-all duration-200"
+                  className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-white/20 dark:hover:bg-gray-700/20 rounded-lg transition-all duration-200"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -100,7 +107,7 @@ export const Panel: React.FC<PanelProps> = ({ isOpen, onClose, messages, onMessa
             {/* Content */}
             <motion.div
               layout
-              className={`p-4 overflow-y-auto transition-all duration-300 ${tabHeights[activeTab]}`}
+              className={`relative p-4 overflow-y-auto transition-all duration-300 ${tabHeights[activeTab]}`}
             >
               {activeTab === 'chats' && (
                 <Chat messages={messages} onMessagesUpdate={onMessagesUpdate} />
@@ -108,7 +115,7 @@ export const Panel: React.FC<PanelProps> = ({ isOpen, onClose, messages, onMessa
 
               {activeTab === 'memory' && (
                 <div className="space-y-3">
-                  <div className="p-4 rounded-lg bg-gradient-to-br from-purple-500/10 to-pink-500/10 backdrop-blur-sm border border-purple-200/20 dark:border-purple-700/20">
+                  <div className="p-4 rounded-lg bg-white/20 dark:bg-gray-800/20 backdrop-blur-sm border border-white/20 dark:border-gray-700/20">
                     <h3 className="font-medium text-gray-800 dark:text-gray-200 mb-2">Context Memory</h3>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
                       I remember your preferences and context from our conversations to provide better assistance.
@@ -124,7 +131,7 @@ export const Panel: React.FC<PanelProps> = ({ isOpen, onClose, messages, onMessa
 
               {activeTab === 'settings' && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-100/50 dark:hover:bg-gray-800/50 transition-colors">
+                  <div className="flex items-center justify-between p-3 rounded-lg hover:bg-white/20 dark:hover:bg-gray-800/20 transition-colors">
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Dark Mode</span>
                     <button
                       onClick={() => settingsManager.set('darkMode', !darkMode)}
@@ -133,7 +140,7 @@ export const Panel: React.FC<PanelProps> = ({ isOpen, onClose, messages, onMessa
                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${darkMode ? 'translate-x-6' : 'translate-x-1'}`}></span>
                     </button>
                   </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-100/50 dark:hover:bg-gray-800/50 transition-colors">
+                  <div className="flex items-center justify-between p-3 rounded-lg hover:bg-white/20 dark:hover:bg-gray-800/20 transition-colors">
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Notifications</span>
                     <button
                       onClick={() => settingsManager.set('notifications', !notifications)}
@@ -142,7 +149,7 @@ export const Panel: React.FC<PanelProps> = ({ isOpen, onClose, messages, onMessa
                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${notifications ? 'translate-x-6' : 'translate-x-1'}`}></span>
                     </button>
                   </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-100/50 dark:hover:bg-gray-800/50 transition-colors">
+                  <div className="flex items-center justify-between p-3 rounded-lg hover:bg-white/20 dark:hover:bg-gray-800/20 transition-colors">
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Auto-complete</span>
                     <button
                       onClick={() => settingsManager.set('autoComplete', !autoComplete)}
