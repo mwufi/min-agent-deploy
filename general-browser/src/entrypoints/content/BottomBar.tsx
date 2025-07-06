@@ -33,7 +33,7 @@ export const BottomBar: React.FC<BottomBarProps> = ({
   };
 
   return (
-    <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-full max-w-2xl px-4 z-50">
+    <div className="relative mx-auto w-full max-w-2xl px-4">
       <div className="flex items-end gap-3">
         {/* Toggle Panel Button */}
         <button

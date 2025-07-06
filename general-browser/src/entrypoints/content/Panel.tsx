@@ -47,7 +47,7 @@ export const Panel: React.FC<PanelProps> = ({ isOpen, onClose, messages, onMessa
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
           transition={{ duration: 0.2 }}
-          className="fixed bottom-24 left-1/2 transform -translate-x-1/2 w-full max-w-2xl px-4 z-40"
+          className="w-full"
         >
           <motion.div
             layout
