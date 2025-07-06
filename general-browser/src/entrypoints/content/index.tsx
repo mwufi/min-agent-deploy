@@ -61,6 +61,10 @@ export default defineContentScript({
 
     // Initialize Gmail context
     initializeGmailContext($);
+    
+    // Make gmail accessible globally for other components
+    // @ts-ignore
+    window.gmail = new GmailFactory.Gmail($);
   },
 });
 
@@ -74,6 +78,10 @@ function initializeGmailContext(jq: any) {
   // Initialize our systems
   const observationBus = createObservationBus();
   const gmailContext = new GmailContext(gmail);
+  
+  // Store instances globally
+  // @ts-ignore
+  window.gmailContext = gmailContext;
 
   // Track Gmail initialization and check API availability
   const hasNewApi = gmail.new && gmail.new.get && typeof gmail.new.get.thread_id === 'function';

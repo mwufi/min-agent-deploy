@@ -3,11 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { createActionBus } from '@/lib/EventBus';
 import { SettingsManager } from '@/lib/SettingsManager';
 
+import { Attachment } from './types';
+
 interface Message {
   id: string;
   text: string;
   sender: 'user' | 'ai';
   timestamp: number;
+  attachments?: Attachment[];
 }
 
 interface ChatProps {
@@ -32,13 +35,14 @@ export const Chat: React.FC<ChatProps> = ({ messages, onMessagesUpdate }) => {
   useEffect(() => {
     // Listen for chat events
     const handleChatEvent = async (event: any) => {
-      if (event.message && event.userId === 'user') {
+      if ((event.message || event.attachments?.length > 0) && event.userId === 'user') {
         // Add user message
         const userMessage: Message = {
           id: `msg-${Date.now()}`,
-          text: event.message,
+          text: event.message || '',
           sender: 'user',
-          timestamp: event.timestamp
+          timestamp: event.timestamp,
+          attachments: event.attachments
         };
         
         const updatedMessages = [...messages, userMessage];
@@ -58,17 +62,30 @@ export const Chat: React.FC<ChatProps> = ({ messages, onMessagesUpdate }) => {
             // });
 
             // Mock response
-            const aiResponses = [
-              "I understand you're working with Gmail. How can I help you today?",
-              "That's an interesting question! Let me help you with that.",
-              "I've analyzed your request. Here's what I suggest...",
-              "Based on your Gmail context, I can assist you with email management.",
-              "I'm here to help! What specific task would you like to accomplish?"
-            ];
+            let responseText = '';
+            if (event.attachments?.length > 0) {
+              const emailCount = event.attachments.filter((a: Attachment) => a.type === 'email').length;
+              if (emailCount > 0) {
+                responseText = `I see you've attached ${emailCount} email${emailCount > 1 ? 's' : ''}. Let me analyze ${emailCount > 1 ? 'them' : 'it'} for you...\n\n`;
+                responseText += `Based on the email${emailCount > 1 ? 's' : ''} from ${event.attachments[0].metadata?.from || 'the sender'}, `;
+                responseText += `I can help you draft a response, summarize the content, or extract action items.`;
+              } else {
+                responseText = `I've received your attachment${event.attachments.length > 1 ? 's' : ''}. How would you like me to help with ${event.attachments.length > 1 ? 'them' : 'it'}?`;
+              }
+            } else {
+              const aiResponses = [
+                "I understand you're working with Gmail. How can I help you today?",
+                "That's an interesting question! Let me help you with that.",
+                "I've analyzed your request. Here's what I suggest...",
+                "Based on your Gmail context, I can assist you with email management.",
+                "I'm here to help! What specific task would you like to accomplish?"
+              ];
+              responseText = aiResponses[Math.floor(Math.random() * aiResponses.length)];
+            }
 
             const aiMessage: Message = {
               id: `msg-${Date.now()}-ai`,
-              text: aiResponses[Math.floor(Math.random() * aiResponses.length)],
+              text: responseText,
               sender: 'ai',
               timestamp: Date.now()
             };
@@ -107,7 +124,19 @@ export const Chat: React.FC<ChatProps> = ({ messages, onMessagesUpdate }) => {
                     : 'bg-gray-100/70 dark:bg-gray-800/70 text-gray-800 dark:text-gray-200'
                 }`}
               >
-                <p className="text-sm">{message.text}</p>
+                <p className="text-sm whitespace-pre-wrap">{message.text}</p>
+                {message.attachments && message.attachments.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {message.attachments.map((attachment) => (
+                      <div key={attachment.id} className="text-xs opacity-80">
+                        📎 {attachment.name}
+                        {attachment.metadata?.subject && (
+                          <span className="block pl-4 italic">"{attachment.metadata.subject}"</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <p className="text-xs opacity-70 mt-1">
                   {new Date(message.timestamp).toLocaleTimeString([], { 
                     hour: '2-digit', 
