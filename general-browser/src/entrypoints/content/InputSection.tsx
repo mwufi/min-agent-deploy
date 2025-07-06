@@ -28,9 +28,9 @@ export const InputSection: React.FC<InputSectionProps> = ({
   };
 
   return (
-    <div className="p-3">
-      <div className="flex items-end gap-3">
-        <div className="flex-1 relative">
+    <div className="p-3 py-1">
+      <div className="flex items-center gap-3">
+        <div className="flex-1 relative flex">
           <textarea
             ref={textareaRef}
             value={value}
@@ -39,7 +39,7 @@ export const InputSection: React.FC<InputSectionProps> = ({
             placeholder={placeholder}
             disabled={disabled}
             rows={1}
-            className="w-full px-4 py-3 pr-12 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl text-gray-700 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:border-purple-400/50 focus:bg-white/70 dark:focus:bg-gray-800/70 transition-all duration-200 resize-none"
+            className="w-full h-full px-4 py-3 pr-12 bg-white/50 dark:bg-transparent rounded-2xl text-gray-700 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:border-purple-400/50 focus:bg-white/70 dark:focus:bg-transparent transition-all duration-200 resize-none"
             style={{ minHeight: '48px' }}
           />
           
