@@ -15,65 +15,40 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({ onClose }) => {
 
   // Listen to Gmail context changes
   useEffect(() => {
-    let gmailContext: GmailContext | null = null;
-    
-    const setupGmailListener = () => {
+    const checkSelection = () => {
       // @ts-ignore
-      const gmail = window.gmail;
-      if (!gmail || gmailContext) return;
-
-      // Create a single instance
-      gmailContext = new GmailContext(gmail);
+      const gmailContext = window.gmailContext;
+      if (!gmailContext) return;
       
-      // Check for updates periodically
-      const checkSelection = () => {
-        if (!gmailContext) return;
-        
-        const context = gmailContext.getContext();
-        const selectedEmails = context.selectedEmails || [];
-        
-        // Convert selected emails to attachments
-        if (selectedEmails.length > 0) {
-          const emailAttachments: Attachment[] = selectedEmails.map((email, index) => ({
-            id: `email-${email.threadId || index}`,
-            type: 'email' as const,
-            name: email.from?.name || 'Unknown sender',
-            metadata: {
-              subject: email.subject || 'No subject',
-              from: email.from?.email || email.from?.name,
-              date: email.date,
-              size: 1024 // Mock size
-            }
-          }));
-          setAttachments(emailAttachments);
-        } else {
-          setAttachments([]);
-        }
-      };
-
-      // Initial check
-      checkSelection();
+      const context = gmailContext.getContext();
+      const selectedEmails = context.selectedEmails || [];
       
-      // Set up periodic check
-      const interval = setInterval(checkSelection, 1000);
-      
-      return () => {
-        clearInterval(interval);
-      };
-    };
-
-    // Try to set up listener, retry if gmail not ready
-    const retryTimer = setInterval(() => {
-      // @ts-ignore
-      if (window.gmail) {
-        setupGmailListener();
-        clearInterval(retryTimer);
+      // Convert selected emails to attachments
+      if (selectedEmails.length > 0) {
+        const emailAttachments: Attachment[] = selectedEmails.map((email, index) => ({
+          id: `email-${email.threadId || index}`,
+          type: 'email' as const,
+          name: email.from?.name || 'Unknown sender',
+          metadata: {
+            subject: email.subject || 'No subject',
+            from: email.from?.email || email.from?.name,
+            date: email.date,
+            size: 1024 // Mock size
+          }
+        }));
+        setAttachments(emailAttachments);
+      } else {
+        setAttachments([]);
       }
-    }, 500);
-
-    return () => {
-      clearInterval(retryTimer);
     };
+
+    // Check every 500ms for selection changes
+    const interval = setInterval(checkSelection, 500);
+    
+    // Initial check
+    checkSelection();
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleTogglePanel = () => {
