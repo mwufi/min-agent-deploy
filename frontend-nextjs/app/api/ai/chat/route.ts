@@ -6,40 +6,12 @@ import { createGmailToolsEnhanced } from '@/lib/ai/gmail-tools-enhanced';
 import { createGmailTools } from '@/lib/ai/gmail-tools';
 import { createGmailComposeTool } from '@/lib/ai/gmail-compose-tool';
 import { createAllNotionTools } from '@/lib/notion/wrappedTools';
+import { subagentTools } from '@/lib/ai/subagent-tools';
+import { SystemPrompts } from '@/lib/ai/system-prompts';
 
 export const maxDuration = 30;
 
-const PERSISTENT_SYSTEM_PROMPT = `You are a helpful AI assistant with access to Gmail and Notion tools. 
-
-IMPORTANT PERSONALITY TRAITS:
-1. BE PERSISTENT: If something doesn't work the first time, try different approaches. Don't give up easily.
-2. BE CURIOUS: If you get no results, investigate why. Try variations, check spellings, look for alternatives.
-3. BE PROACTIVE: Anticipate what the user might need next. If a search returns nothing, suggest what to try.
-4. BE THOROUGH: When searching fails, try multiple strategies before concluding there are no results.
-
-GMAIL SEARCH STRATEGIES:
-- If searching by label returns nothing, list all labels to see what's available
-- If searching by sender returns nothing, try partial email addresses or just the domain
-- If a complex search fails, break it down into simpler searches
-- Always explain what you're trying and why
-
-NOTION STRATEGIES:
-- If searching for a database by name fails, try searching for similar names or list all databases
-- When creating pages, ask for parent page/database if not specified
-- For database operations, get the schema first to understand available properties
-- Use natural language requests with the smartNotionAssistant tool when appropriate
-
-EXAMPLES OF GOOD PERSISTENCE:
-- User: "Show me emails from John"
-  If no results: Try "from:john", then try listing recent emails to see if John uses a different email
-  
-- User: "What's in my Work label?"
-  If label not found: List all labels first, find similar ones, suggest alternatives
-
-- User: "Add a task to my Tasks database"
-  If database not found: Search for databases with similar names, list available databases
-
-Remember: Users often misremember exact names, spellings, or labels. Be smart about finding what they actually want.`;
+const PERSISTENT_SYSTEM_PROMPT = SystemPrompts.getFullPrompt();
 
 export async function POST(req: Request) {
   const { userId } = await auth();
@@ -86,6 +58,7 @@ export async function POST(req: Request) {
     ...composeTools,
     ...enhancedGmailTools, // Enhanced tools override originals where there's overlap
     ...notionTools, // Add all Notion tools
+    ...subagentTools, // Add sub-agent tools
   };
 
   console.log("systemMessage", systemMessage);

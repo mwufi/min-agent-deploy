@@ -37,6 +37,7 @@ import {
 } from './NotionTools';
 import { PipedreamTools } from './PipedreamTools';
 import { Weather } from '../../weather';
+import { SubagentTools } from './SubagentTools';
 
 interface ToolRendererProps {
   toolInvocation: any;
@@ -159,6 +160,10 @@ export function ToolRenderer({ toolInvocation, showJson = {}, toggleJson }: Tool
       // Weather
       case 'get_current_weather':
         return <Weather weatherAtLocation={result} />;
+      
+      // Sub-agent tools
+      case 'launchSubagent':
+        return <SubagentTools toolName={toolName} args={args} result={result} />;
       
       // Default fallback
       default:
