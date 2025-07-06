@@ -19,6 +19,9 @@ export interface EmailData {
     name?: string;
   }>;
   body?: string;
+  snippet?: string;
+  date?: string;
+  labels?: string[];
 }
 
 export class GmailContext {
@@ -27,6 +30,7 @@ export class GmailContext {
   private gmail: Gmail | null = null;
   private currentEmail: EmailData | null = null;
   private selectedThreadIds: string[] = [];
+  private selectedEmails: EmailData[] = [];
 
   constructor(gmail?: Gmail) {
     if (gmail) {
@@ -38,15 +42,17 @@ export class GmailContext {
   private setupEventListeners() {
     if (!this.gmail) return;
 
-    // Track view changes
+    // Track view changes and update email data using new API
     this.gmail.observe.on('view_thread', (thread) => {
       this.addAction('view_thread', { threadId: thread.id });
-      this.updateCurrentEmail();
+      // Use a slight delay to ensure DOM is ready
+      setTimeout(() => this.updateCurrentEmail(), 100);
     });
 
     this.gmail.observe.on('view_email', (email) => {
       this.addAction('view_email', { messageId: email.id });
-      this.updateCurrentEmail();
+      // Use a slight delay to ensure DOM is ready
+      setTimeout(() => this.updateCurrentEmail(), 100);
     });
 
     // Track compose and reply
@@ -79,18 +85,19 @@ export class GmailContext {
       this.addAction('star', data);
     });
 
-    // Track navigation
-    this.gmail.observe.on('http_event', (params) => {
-      if (params.url?.includes('inbox')) {
+    // Track navigation via DOM observation (safer)
+    this.gmail.observe.on('load', () => {
+      const currentPage = window.location.hash;
+      if (currentPage.includes('inbox')) {
         this.addAction('navigate_inbox');
-      } else if (params.url?.includes('sent')) {
+      } else if (currentPage.includes('sent')) {
         this.addAction('navigate_sent');
-      } else if (params.url?.includes('drafts')) {
+      } else if (currentPage.includes('drafts')) {
         this.addAction('navigate_drafts');
       }
     });
 
-    // Track selection changes
+    // Track selection changes - these events might not fire, so let's also use DOM observation
     this.gmail.observe.on('select_thread', (thread) => {
       if (!this.selectedThreadIds.includes(thread.id)) {
         this.selectedThreadIds.push(thread.id);
@@ -108,12 +115,26 @@ export class GmailContext {
         totalSelected: this.selectedThreadIds.length 
       });
     });
+    
+    // Alternative selection tracking via DOM observation
+    this.trackSelectionViaDOM();
   }
 
   private addAction(type: string, data?: any) {
+    // Debounce duplicate actions within 500ms
+    const now = Date.now();
+    const lastAction = this.actions[0];
+    
+    if (lastAction && 
+        lastAction.type === type && 
+        now - lastAction.timestamp < 500 &&
+        JSON.stringify(lastAction.data) === JSON.stringify(data)) {
+      return; // Skip duplicate
+    }
+
     const action: GmailAction = {
       type,
-      timestamp: Date.now(),
+      timestamp: now,
       data
     };
 
@@ -125,34 +146,42 @@ export class GmailContext {
     }
 
     console.log('[GmailContext] Action:', type, data);
-    console.log('[GmailContext] Recent actions:', this.getRecentActions());
   }
 
   private updateCurrentEmail() {
     if (!this.gmail) return;
 
     try {
-      const email = this.gmail.get.email_data();
-      if (email) {
-        this.currentEmail = {
-          threadId: email.thread_id,
-          messageId: email.id,
-          subject: email.subject,
-          from: {
-            email: email.from?.email,
-            name: email.from?.name
-          },
-          to: email.to?.map(recipient => ({
-            email: recipient.email,
-            name: recipient.name
-          })),
-          body: email.content_plain || email.content_html
-        };
+      // Use the new API to get thread ID from DOM
+      const threadId = this.gmail.new.get.thread_id();
+      
+      if (threadId) {
+        // Get email data using the new API (DOM-based, no API calls)
+        const emailData = this.gmail.new.get.email_data(threadId);
         
-        console.log('[GmailContext] Current email updated:', this.currentEmail);
+        if (emailData) {
+          this.currentEmail = {
+            threadId: emailData.thread_id,
+            messageId: emailData.id || threadId,
+            subject: emailData.subject || 'No subject',
+            from: {
+              email: emailData.from?.email,
+              name: emailData.from?.name || emailData.from?.email
+            },
+            to: emailData.to?.map((recipient: any) => ({
+              email: recipient.email,
+              name: recipient.name || recipient.email
+            })),
+            body: emailData.content_plain || emailData.content_html || ''
+          };
+          
+          console.log('[GmailContext] Current email updated (new API):', this.currentEmail);
+        }
       }
     } catch (error) {
-      console.error('[GmailContext] Error updating current email:', error);
+      // The new API might not always work depending on Gmail's state
+      console.log('[GmailContext] Could not extract email data:', error);
+      this.currentEmail = null;
     }
   }
 
@@ -177,7 +206,94 @@ export class GmailContext {
       recentActions: this.getRecentActions(),
       currentEmail: this.getCurrentEmail(),
       selectedThreadIds: this.getSelectedThreadIds(),
+      selectedEmails: this.getSelectedEmails(),
       timestamp: Date.now()
     };
+  }
+  
+  getSelectedEmails(): EmailData[] {
+    return [...this.selectedEmails];
+  }
+
+  private trackSelectionViaDOM() {
+    let lastSelectionCount = 0;
+    
+    // Poll for selection changes every 500ms
+    setInterval(() => {
+      try {
+        // Find all selected thread rows
+        const selectedRows: EmailData[] = [];
+        const selectedIds: string[] = [];
+        
+        // Find all thread rows and check if they're selected
+        const allRows = document.querySelectorAll('tr.zA');
+        
+        allRows.forEach((row: Element) => {
+          const checkbox = row.querySelector('div[role="checkbox"][aria-checked="true"], td.xY input[type="checkbox"]:checked');
+          if (!checkbox) return; // Skip unselected rows
+          try {
+            // Extract email data from the row
+            const threadId = row.getAttribute('id') || '';
+            const senderElement = row.querySelector('.yW span[email]') || row.querySelector('.yW');
+            const subjectElement = row.querySelector('.y6 span[id]:not([aria-label])') || row.querySelector('.y6');
+            const snippetElement = row.querySelector('.y2');
+            const dateElement = row.querySelector('.xW span[title]') || row.querySelector('.xW');
+            
+            // Extract labels
+            const labelElements = row.querySelectorAll('.ar span.av');
+            const labels: string[] = [];
+            labelElements.forEach(label => {
+              const text = label.textContent?.trim();
+              if (text) labels.push(text);
+            });
+            
+            const emailData: EmailData = {
+              threadId,
+              subject: subjectElement?.textContent?.trim() || 'No subject',
+              from: {
+                name: senderElement?.textContent?.trim() || 'Unknown sender',
+                email: senderElement?.getAttribute('email') || undefined
+              },
+              snippet: snippetElement?.textContent?.trim(),
+              date: dateElement?.getAttribute('title') || dateElement?.textContent?.trim(),
+              labels
+            };
+            
+            selectedRows.push(emailData);
+            selectedIds.push(threadId);
+          } catch (e) {
+            // Skip this row if parsing fails
+          }
+        });
+        
+        const currentCount = selectedRows.length;
+        
+        // Update internal state
+        this.selectedEmails = selectedRows;
+        this.selectedThreadIds = selectedIds;
+        
+        // Only log if selection changed
+        if (currentCount !== lastSelectionCount) {
+          console.log(`[GmailContext] Selection changed: ${lastSelectionCount} -> ${currentCount} items selected`);
+          console.log('[GmailContext] Selected emails:', selectedRows);
+          
+          if (currentCount > lastSelectionCount) {
+            this.addAction('select_threads', { 
+              count: currentCount,
+              emails: selectedRows
+            });
+          } else {
+            this.addAction('deselect_threads', { 
+              count: currentCount,
+              emails: selectedRows
+            });
+          }
+          
+          lastSelectionCount = currentCount;
+        }
+      } catch (error) {
+        console.error('[GmailContext] Error tracking selection:', error);
+      }
+    }, 500);
   }
 }

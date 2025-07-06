@@ -1,5 +1,6 @@
-import { defineConfig } from 'wxt';
+import { defineConfig, type WxtViteConfig } from 'wxt';
 import { resolve } from 'path';
+import tailwindcss from '@tailwindcss/vite'
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
@@ -8,6 +9,9 @@ export default defineConfig({
   alias: {
     '@': resolve(__dirname, './src'),
   },
+  vite: () => ({
+    plugins: [tailwindcss()],
+  } as WxtViteConfig),
   manifest: {
     name: 'GENESIS AI Browser Assistant',
     description: 'AI-powered browser assistant that helps you with tasks',

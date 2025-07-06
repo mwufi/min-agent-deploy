@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.11",
+    "@tailwindcss/vite": "^4.1.11",
     "autoprefixer": "^10.4.21",
     "gmail-js": "^1.1.16",
     "jquery": "^3.7.1",
