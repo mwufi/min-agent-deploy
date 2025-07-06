@@ -29,10 +29,10 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({ onClose }) => {
       // @ts-ignore
       const gmailContext = window.gmailContext;
       if (!gmailContext) return;
-      
+
       const context = gmailContext.getContext();
       const selectedEmails = context.selectedEmails || [];
-      
+
       // Convert selected emails to attachments
       if (selectedEmails.length > 0) {
         const emailAttachments: Attachment[] = selectedEmails.map((email, index) => ({
@@ -54,7 +54,7 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({ onClose }) => {
 
     // Check every 500ms for selection changes
     const interval = setInterval(checkSelection, 500);
-    
+
     // Initial check
     checkSelection();
 
@@ -84,12 +84,12 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({ onClose }) => {
         timestamp: Date.now(),
         attachments: attachments.length > 0 ? [...attachments] : undefined
       };
-      
+
       setMessages(prev => [...prev, userMessage]);
-      
+
       // Clear attachments after sending
       setAttachments([]);
-      
+
       // Generate AI response after a delay
       setTimeout(() => {
         generateAIResponse(message, attachments);
@@ -99,7 +99,7 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({ onClose }) => {
 
   const generateAIResponse = (userMessage: string, userAttachments: Attachment[]) => {
     let responseText = '';
-    
+
     if (userAttachments.length > 0) {
       const emailCount = userAttachments.filter(a => a.type === 'email').length;
       if (emailCount > 0) {
@@ -131,32 +131,39 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50">
-      {/* Container for both panel and bar */}
-      <div className="relative">
-        {/* Panel - positioned above the bar */}
-        {isPanelOpen && (
-          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 w-full max-w-2xl px-4 mb-1">
-            <Panel 
-              isOpen={isPanelOpen} 
-              onClose={handleClosePanel}
-              messages={messages}
-              onMessagesUpdate={setMessages}
+    <>
+      {/* Subtle scrim for contrast on light backgrounds */}
+      {isPanelOpen && (
+        <div className="fixed inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent pointer-events-none z-40" />
+      )}
+
+      <div className="fixed bottom-0 left-0 right-0 z-50">
+        {/* Container for both panel and bar */}
+        <div className="relative">
+          {/* Panel - positioned above the bar */}
+          {isPanelOpen && (
+            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 w-full max-w-2xl px-4 mb-1">
+              <Panel
+                isOpen={isPanelOpen}
+                onClose={handleClosePanel}
+                messages={messages}
+                onMessagesUpdate={setMessages}
+              />
+            </div>
+          )}
+
+          {/* Bar - at the bottom */}
+          <div className="pb-6">
+            <BottomBar
+              onTogglePanel={handleTogglePanel}
+              isPanelOpen={isPanelOpen}
+              onSendMessage={handleSendMessage}
+              attachments={attachments}
+              onAttachmentsChange={setAttachments}
             />
           </div>
-        )}
-        
-        {/* Bar - at the bottom */}
-        <div className="pb-6">
-          <BottomBar 
-            onTogglePanel={handleTogglePanel} 
-            isPanelOpen={isPanelOpen}
-            onSendMessage={handleSendMessage}
-            attachments={attachments}
-            onAttachmentsChange={setAttachments}
-          />
         </div>
       </div>
-    </div>
+    </>
   );
 };

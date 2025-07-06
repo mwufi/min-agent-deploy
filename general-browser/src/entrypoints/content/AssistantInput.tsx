@@ -28,7 +28,7 @@ export const AssistantInput: React.FC<AssistantInputProps> = ({
   };
 
   return (
-    <div className="backdrop-blur-md bg-white/70 dark:bg-gray-700/50 rounded-2xl shadow-2xl border border-white/20 dark:border-gray-700/30 overflow-hidden">
+    <div className="backdrop-blur-xl bg-gray-800/50 dark:bg-gray-800/60 rounded-2xl shadow-2xl ring-1 ring-white/10 border border-white/10 dark:border-gray-700/20 overflow-hidden">
       <AttachmentSection
         attachments={attachments}
         onRemove={handleRemoveAttachment}

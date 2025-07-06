@@ -52,7 +52,7 @@ export const Panel: React.FC<PanelProps> = ({ isOpen, onClose, messages, onMessa
           <motion.div
             layout
             transition={{ layout: { duration: 0.3 } }}
-            className="relative backdrop-blur-md bg-white/10 dark:bg-gray-900/10 rounded-2xl shadow-2xl border border-white/20 dark:border-gray-700/30 overflow-hidden"
+            className="relative backdrop-blur-xl bg-gray-900/60 dark:bg-gray-900/70 rounded-2xl shadow-2xl ring-1 ring-white/10 border border-white/10 dark:border-gray-700/20 overflow-hidden"
           >
             {/* Decorative blurred ellipses */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -60,7 +60,7 @@ export const Panel: React.FC<PanelProps> = ({ isOpen, onClose, messages, onMessa
               <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-pink-500/20 rounded-full blur-3xl" />
               <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl" />
             </div>
-            
+
             {/* Header with tabs */}
             <div className="relative border-b border-gray-200/10 dark:border-gray-700/20 backdrop-blur-sm bg-transparent">
               <div className="flex items-center justify-between p-4">
@@ -68,8 +68,8 @@ export const Panel: React.FC<PanelProps> = ({ isOpen, onClose, messages, onMessa
                   <button
                     onClick={() => setActiveTab('chats')}
                     className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${activeTab === 'chats'
-                        ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-600 dark:text-purple-400 backdrop-blur-sm'
-                        : 'text-gray-600 dark:text-gray-400 hover:bg-white/20 dark:hover:bg-gray-700/20'
+                      ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-600 dark:text-purple-400 backdrop-blur-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-white/20 dark:hover:bg-gray-700/20'
                       }`}
                   >
                     Chats
@@ -77,8 +77,8 @@ export const Panel: React.FC<PanelProps> = ({ isOpen, onClose, messages, onMessa
                   <button
                     onClick={() => setActiveTab('memory')}
                     className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${activeTab === 'memory'
-                        ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-600 dark:text-purple-400 backdrop-blur-sm'
-                        : 'text-gray-600 dark:text-gray-400 hover:bg-white/20 dark:hover:bg-gray-700/20'
+                      ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-600 dark:text-purple-400 backdrop-blur-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-white/20 dark:hover:bg-gray-700/20'
                       }`}
                   >
                     Memory
@@ -86,8 +86,8 @@ export const Panel: React.FC<PanelProps> = ({ isOpen, onClose, messages, onMessa
                   <button
                     onClick={() => setActiveTab('settings')}
                     className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${activeTab === 'settings'
-                        ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-600 dark:text-purple-400 backdrop-blur-sm'
-                        : 'text-gray-600 dark:text-gray-400 hover:bg-white/20 dark:hover:bg-gray-700/20'
+                      ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-600 dark:text-purple-400 backdrop-blur-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-white/20 dark:hover:bg-gray-700/20'
                       }`}
                   >
                     Settings
