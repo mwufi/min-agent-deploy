@@ -183,6 +183,56 @@ export class ActionBus {
   }
 }
 
+// Simple event emitter for local events (no server connection)
+export class LocalActionBus {
+  private handlers = new Map<string, Set<ActionHandler>>();
+
+  on<T = any>(eventType: string, handler: ActionHandler<T>) {
+    if (!this.handlers.has(eventType)) {
+      this.handlers.set(eventType, new Set());
+    }
+    this.handlers.get(eventType)!.add(handler);
+    
+    // Return unsubscribe function
+    return () => {
+      const handlers = this.handlers.get(eventType);
+      if (handlers) {
+        handlers.delete(handler);
+        if (handlers.size === 0) {
+          this.handlers.delete(eventType);
+        }
+      }
+    };
+  }
+
+  emit(eventType: string, data: any) {
+    const handlers = this.handlers.get(eventType);
+    if (!handlers) return;
+    
+    console.log('[LocalActionBus] Emitting', eventType, data);
+    
+    for (const handler of handlers) {
+      try {
+        handler(data);
+      } catch (error) {
+        console.error(`[LocalActionBus] Handler error for ${eventType}:`, error);
+      }
+    }
+  }
+
+  destroy() {
+    this.handlers.clear();
+  }
+}
+
+// Singleton instance for action bus
+let actionBusInstance: LocalActionBus | null = null;
+
 // Factory functions for cleaner API
 export const createObservationBus = (config?: ObservationBusConfig) => new ObservationBus(config);
-export const createActionBus = (endpoint: string | ActionBusConfig) => new ActionBus(endpoint);
+export const createActionBus = () => {
+  if (!actionBusInstance) {
+    actionBusInstance = new LocalActionBus();
+  }
+  return actionBusInstance;
+};

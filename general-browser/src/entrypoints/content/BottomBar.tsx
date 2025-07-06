@@ -1,12 +1,34 @@
 import React, { useState } from 'react';
+import { createActionBus } from '@/lib/EventBus';
 
 interface BottomBarProps {
   onTogglePanel: () => void;
   isPanelOpen: boolean;
+  onSendMessage: (message: string) => void;
 }
 
-export const BottomBar: React.FC<BottomBarProps> = ({ onTogglePanel, isPanelOpen }) => {
+export const BottomBar: React.FC<BottomBarProps> = ({ onTogglePanel, isPanelOpen, onSendMessage }) => {
   const [message, setMessage] = useState('');
+  const actionBus = createActionBus();
+
+  const handleSend = () => {
+    if (message.trim()) {
+      onSendMessage(message);
+      actionBus.emit('chat', { 
+        message, 
+        timestamp: Date.now(),
+        userId: 'user'
+      });
+      setMessage('');
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
 
   return (
     <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-full max-w-2xl px-4 z-50">
@@ -34,10 +56,15 @@ export const BottomBar: React.FC<BottomBarProps> = ({ onTogglePanel, isPanelOpen
                 type="text"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
                 placeholder="Ask anything..."
                 className="w-full px-5 py-3 pr-12 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-full text-gray-700 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:border-purple-400/50 focus:bg-white/70 dark:focus:bg-gray-800/70 transition-all duration-200"
               />
-              <button className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 text-purple-500 hover:text-purple-600 transition-colors">
+              <button 
+                onClick={handleSend}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 text-purple-500 hover:text-purple-600 transition-colors disabled:opacity-50"
+                disabled={!message.trim()}
+              >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                 </svg>
