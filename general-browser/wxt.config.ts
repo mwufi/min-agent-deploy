@@ -16,7 +16,11 @@ export default defineConfig({
     name: 'GENESIS AI Browser Assistant',
     description: 'AI-powered browser assistant that helps you with tasks',
     permissions: ['storage', 'tabs', 'scripting'],
-    host_permissions: ['https://mail.google.com/*'],
+    host_permissions: [
+      'https://mail.google.com/*',
+      'https://docs.google.com/*',
+      'https://sheets.google.com/*'
+    ],
     action: {
       default_title: 'Toggle GENESIS AI Assistant',
     },
