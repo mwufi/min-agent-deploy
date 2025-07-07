@@ -17,6 +17,8 @@ export async function GET(request: NextRequest) {
             external_user_id: options?.external_user_id,
             include_credentials: options?.include_credentials,
         });
+
+        console.log("[debug] accounts", JSON.stringify(accounts, null, 2));
         return NextResponse.json(accounts);
     } catch (error) {
         return NextResponse.json(
