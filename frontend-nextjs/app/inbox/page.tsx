@@ -15,6 +15,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 function formatEmailTime(dateString: string): string {
   try {
@@ -135,7 +141,8 @@ export default function InboxPage() {
   const threads = data?.threads || [];
 
   return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
+    <TooltipProvider>
+      <div className="flex-1 space-y-4 p-8 pt-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Inbox</h2>
@@ -202,7 +209,18 @@ export default function InboxPage() {
                 </Button>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-2">
-                    <span className="font-medium truncate flex-shrink-0">{thread.sender}</span>
+                    {thread.senderEmail ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="font-medium truncate flex-shrink-0 cursor-help">{thread.sender}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{thread.senderEmail}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <span className="font-medium truncate flex-shrink-0">{thread.sender}</span>
+                    )}
                     <span className="text-sm text-muted-foreground truncate">
                       {truncateSubject(thread.subject)}
                     </span>
@@ -217,5 +235,6 @@ export default function InboxPage() {
         )}
       </div>
     </div>
+    </TooltipProvider>
   );
 }

@@ -5,6 +5,7 @@ export interface EmailThread {
   threadId: string;
   subject: string;
   sender: string;
+  senderEmail?: string;
   time: string;
   internalDate?: number; // For sorting purposes
 }

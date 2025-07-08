@@ -26,6 +26,7 @@ export const emailMessages = pgTable('email_messages', {
   userId: text('user_id').notNull(),
   accountId: text('account_id').notNull(),
   from: text('from'),
+  fromEmail: text('from_email'),
   to: jsonb('to').$type<string[]>(),
   cc: jsonb('cc').$type<string[]>(),
   bcc: jsonb('bcc').$type<string[]>(),

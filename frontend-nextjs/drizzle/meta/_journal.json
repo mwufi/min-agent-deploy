@@ -15,6 +15,13 @@
       "when": 1751948808584,
       "tag": "0001_narrow_marvel_zombies",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1751995432463,
+      "tag": "0002_loose_maverick",
+      "breakpoints": true
     }
   ]
 }

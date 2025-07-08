@@ -279,6 +279,7 @@ export async function POST(req: NextRequest) {
         // Extract sender name/email
         const senderMatch = messageData.from.match(/^(?:"?([^"]+)"?\s)?<?([^>]+)>?$/);
         const senderName = senderMatch ? (senderMatch[1] || senderMatch[2]) : messageData.from;
+        const senderEmail = senderMatch ? senderMatch[2] : messageData.from;
 
         messagesInfo.push({
           id: crypto.randomUUID(),
@@ -287,6 +288,7 @@ export async function POST(req: NextRequest) {
           userId,
           accountId,
           from: senderName,
+          fromEmail: senderEmail,
           to: messageData.to,
           cc: messageData.cc,
           bcc: messageData.bcc,

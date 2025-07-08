@@ -10,6 +10,7 @@ interface EmailThread {
   threadId: string;
   subject: string;
   sender: string;
+  senderEmail?: string;
   time: string;
   internalDate?: number;
 }
@@ -144,6 +145,7 @@ async function fetchThreadsFromDB(
       threadId: emailMessages.threadId,
       subject: emailMessages.subject,
       sender: emailMessages.from,
+      senderEmail: emailMessages.fromEmail,
       time: emailMessages.internalDate,
       internalDate: sql<number>`EXTRACT(EPOCH FROM ${emailMessages.internalDate}) * 1000`,
     })
@@ -167,6 +169,7 @@ async function fetchThreadsFromDB(
         threadId: message.threadId,
         subject: message.subject || 'No Subject',
         sender: message.sender || 'Unknown Sender',
+        senderEmail: message.senderEmail || undefined,
         time: message.time?.toISOString() || new Date().toISOString(),
         internalDate: Number(message.internalDate) || 0,
       });
