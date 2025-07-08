@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { listThreads, getThread, getGmailClient } from '@/lib/server/gmail_client';
+import { listThreads, getThread } from '@/lib/server/gmail_client';
 import { db } from '@/lib/db';
 import { emailThreads, emailMessages, gmailSyncHistory } from '@/lib/db/schema';
 import { eq, and, desc, inArray } from 'drizzle-orm';
+import pd from '@/lib/server/pipedream_client';
 
 interface Header {
   name: string;
@@ -74,12 +75,31 @@ export async function POST(req: NextRequest) {
       startedAt: new Date(),
     });
 
-    // Get Gmail client to fetch history ID
-    const gmailClient = await getGmailClient(userId, accountId);
-    
     // Get user's profile to fetch the latest history ID
-    const profile = await gmailClient.users.getProfile({ userId: 'me' });
-    const currentHistoryId = profile.data.historyId || '0';
+    let currentHistoryId = '0';
+    try {
+      const profileResponse = await pd.makeProxyRequest(
+        {
+          searchParams: {
+            account_id: accountId,
+            external_user_id: userId,
+          }
+        },
+        {
+          url: 'https://gmail.googleapis.com/gmail/v1/users/me/profile',
+          options: { method: "GET" }
+        }
+      );
+      
+      const profile = typeof profileResponse === 'string' 
+        ? JSON.parse(profileResponse) 
+        : profileResponse;
+      
+      currentHistoryId = profile.historyId || '0';
+    } catch (error) {
+      console.error('Error fetching Gmail profile:', error);
+      // Continue without history ID
+    }
 
     // Fetch the 50 most recent threads
     const threadsResponse = await listThreads(
