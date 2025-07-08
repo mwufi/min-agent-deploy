@@ -1,4 +1,4 @@
-
+import { formatDistanceToNow } from 'date-fns';
 
 export interface Tool {
     name: string;
@@ -10,6 +10,39 @@ export interface Agent {
     name: string;
     instructions: string;
     tools: Tool[];
+    data?: any;
+}
+
+// the social cue system is a system that operates on the agent's data 
+// to determine if the agent should respond to the event
+// TODO: it'd be nice if it could read the room as well! (ie, room participants, data, etc)
+export class SocialCueSystem {
+    init(agent: Agent, room: MultiAgentRoom) {
+        agent.data.socialCueSystem = {
+            lastResponse: null,
+            lastResponseSender: null,
+            lastResponseTime: null,
+            currentParticipants: room.getAgents().map(agent => agent.name),
+            shouldRespond: false,
+        }
+    }
+
+    update(agent: Agent, event: Event) {
+        if (event.type === "message") {
+            agent.data.socialCueSystem.lastResponse = event.data.message;
+            agent.data.socialCueSystem.lastResponseSender = event.data.sender;
+            agent.data.socialCueSystem.lastResponseTime = event.timestamp;
+
+            // someone sent a message!
+            if (event.data.sender === agent.name) {
+                return;
+            }
+
+            // someone else's message
+            // this corresponds to "always respond"
+            agent.data.socialCueSystem.shouldRespond = true;
+        }
+    }
 }
 
 export interface Event {
@@ -44,19 +77,49 @@ export class LocalEventLog implements EventLog {
     }
 }
 
+export interface Message {
+    sender: string;
+    message: string;
+}
+
 export class MultiAgentRoom {
     private agents: Agent[] = [];
+    private currentConversation: Message[] = [];
     private eventLog: EventLog = new LocalEventLog();
+    private socialCueSystem: SocialCueSystem = new SocialCueSystem();
 
     constructor() {
         this.agents = [];
     }
 
+    getAgents() {
+        return this.agents;
+    }
+
+    getCurrentConversation() {
+        return this.currentConversation;
+    }
+
     addAgent(agent: Agent) {
+        if (agent.data === undefined) {
+            agent.data = {};
+        }
+
+        this.socialCueSystem.init(agent, this);
         this.agents.push(agent);
+        console.log(`[${agent.name}] added to the room`);
+
         this.eventLog.subscribe("message", (event) => {
-            // show the agent got the message
-            console.log(`[${event.timestamp}] ${event.data.sender} -> ${event.data.message}`);
+            // show the agent got the message with formatted timestamp
+            const timeAgo = formatDistanceToNow(new Date(event.timestamp), { addSuffix: true });
+            console.log(`[${agent.name} received] ${event.data.sender}: ${event.data.message} | ${timeAgo}`);
+
+            // should agent respond?
+            this.socialCueSystem.update(agent, event);
+
+            if (agent.data.socialCueSystem.shouldRespond) {
+                console.log(`[${agent.name}] responding`);
+            }
         });
     }
 
