@@ -3,6 +3,10 @@ import { userAccounts } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import pd from './pipedream_client';
 
+// Simple in-memory cache for accounts
+const accountsCache = new Map<string, { accounts: any[], timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 export async function syncUserAccounts(userId: string): Promise<any[]> {
   console.log(`[Accounts Service] Syncing accounts for user ${userId}`);
   
@@ -27,10 +31,21 @@ export async function syncUserAccounts(userId: string): Promise<any[]> {
   });
   
   console.log(`[Accounts Service] Synced ${accounts.length} accounts for user ${userId}`);
+  
+  // Update cache
+  accountsCache.set(userId, { accounts, timestamp: Date.now() });
+  
   return accounts;
 }
 
 export async function getUserAccounts(userId: string): Promise<any[]> {
+  // Check cache first
+  const cached = accountsCache.get(userId);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    console.log(`[Accounts Service] Returning cached accounts for user ${userId}`);
+    return cached.accounts;
+  }
+  
   // Try to get from database first
   const result = await db
     .select()
@@ -40,7 +55,12 @@ export async function getUserAccounts(userId: string): Promise<any[]> {
   
   if (result.length > 0) {
     console.log(`[Accounts Service] Found accounts in DB for user ${userId}`);
-    return result[0].accounts;
+    const accounts = result[0].accounts;
+    
+    // Update cache
+    accountsCache.set(userId, { accounts, timestamp: Date.now() });
+    
+    return accounts;
   }
   
   // If not in DB, sync from Pipedream
@@ -57,5 +77,6 @@ export async function getGmailAccounts(userId: string): Promise<any[]> {
 
 export async function invalidateUserAccounts(userId: string): Promise<void> {
   console.log(`[Accounts Service] Invalidating accounts for user ${userId}`);
+  accountsCache.delete(userId);
   await syncUserAccounts(userId);
 }

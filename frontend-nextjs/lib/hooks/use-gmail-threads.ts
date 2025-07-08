@@ -29,7 +29,9 @@ export function useGmailThreads(options?: UseGmailThreadsOptions) {
       }
       return response.json();
     },
-    refetchInterval: 60000, // Refetch every minute
-    staleTime: 30000, // Consider data stale after 30 seconds
+    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
+    staleTime: 2 * 60 * 1000, // Consider data stale after 2 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: 'always'
   });
 }
