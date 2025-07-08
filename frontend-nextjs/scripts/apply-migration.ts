@@ -15,7 +15,7 @@ async function applyMigration() {
 
   try {
     // Read the migration file
-    const migrationPath = join(process.cwd(), 'drizzle/0000_same_dragon_man.sql');
+    const migrationPath = join(process.cwd(), 'drizzle/0001_narrow_marvel_zombies.sql');
     const migrationSQL = readFileSync(migrationPath, 'utf-8');
     
     // Split by statement-breakpoint and execute each statement

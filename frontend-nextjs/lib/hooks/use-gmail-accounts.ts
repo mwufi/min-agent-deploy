@@ -24,7 +24,9 @@ export function useGmailAccounts() {
     queryKey: ['gmail-accounts', userId],
     queryFn: () => fetchGmailAccounts(userId!),
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes
+    staleTime: 10 * 60 * 1000, // Consider data stale after 10 minutes
+    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
     refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 }

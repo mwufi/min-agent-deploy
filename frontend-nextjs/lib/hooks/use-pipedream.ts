@@ -142,6 +142,10 @@ export const useAccounts = (userId: string) => {
         queryKey: QUERY_KEYS.accounts(userId),
         queryFn: () => fetchAccounts(userId),
         enabled: !!userId,
+        staleTime: 10 * 60 * 1000, // 10 minutes
+        gcTime: 30 * 60 * 1000, // 30 minutes (was cacheTime)
+        refetchOnWindowFocus: false,
+        refetchOnMount: false,
     });
 };
 
@@ -169,9 +173,19 @@ export const useConnectApp = (userId: string) => {
                 });
             });
         },
-        onSuccess: () => {
+        onSuccess: async () => {
+            // Sync accounts to database
+            try {
+                await fetch('/api/pipedream/accounts/sync', {
+                    method: 'POST',
+                });
+            } catch (error) {
+                console.error('Failed to sync accounts:', error);
+            }
+            
             // Refetch accounts after successful connection
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.accounts(userId) });
+            queryClient.invalidateQueries({ queryKey: ['gmail-accounts', userId] });
         },
         onError: (error) => {
             console.error("Connection failed:", error);
@@ -184,9 +198,19 @@ export const useDisconnectAccount = (userId: string) => {
 
     return useMutation({
         mutationFn: disconnectAccount,
-        onSuccess: () => {
+        onSuccess: async () => {
+            // Sync accounts to database
+            try {
+                await fetch('/api/pipedream/accounts/sync', {
+                    method: 'POST',
+                });
+            } catch (error) {
+                console.error('Failed to sync accounts:', error);
+            }
+            
             // Refetch accounts after successful disconnection
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.accounts(userId) });
+            queryClient.invalidateQueries({ queryKey: ['gmail-accounts', userId] });
         },
         onError: (error) => {
             console.error("Disconnection failed:", error);

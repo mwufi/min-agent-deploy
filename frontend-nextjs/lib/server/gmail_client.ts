@@ -1,4 +1,5 @@
 import pd from "./pipedream_client";
+import { getGmailAccounts as getGmailAccountsFromDB } from "./accounts-service";
 
 interface GmailAccount {
     id: string;
@@ -44,13 +45,7 @@ interface GmailThread {
 }
 
 async function getGmailAccounts(userId: string): Promise<GmailAccount[]> {
-    const accounts = await pd.getAccounts({
-        external_user_id: userId,
-    });
-    const gmailAccounts = accounts.data?.filter((account: any) =>
-        account.app?.name?.toLowerCase() === "gmail"
-    ) || [];
-    return gmailAccounts;
+    return getGmailAccountsFromDB(userId);
 }
 
 async function makeGmailRequest<T = any>(

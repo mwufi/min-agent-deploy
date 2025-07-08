@@ -69,6 +69,19 @@ export const gmailSyncHistory = pgTable('gmail_sync_history', {
   };
 });
 
+// User accounts table to store Pipedream connected accounts
+export const userAccounts = pgTable('user_accounts', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id').notNull().unique(),
+  accounts: jsonb('accounts').notNull().$type<any[]>(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => {
+  return {
+    userIdIdx: index('user_accounts_user_id_idx').on(table.userId),
+  };
+});
+
 // Type exports
 export type EmailThread = typeof emailThreads.$inferSelect;
 export type NewEmailThread = typeof emailThreads.$inferInsert;
@@ -76,3 +89,5 @@ export type EmailMessage = typeof emailMessages.$inferSelect;
 export type NewEmailMessage = typeof emailMessages.$inferInsert;
 export type GmailSyncHistory = typeof gmailSyncHistory.$inferSelect;
 export type NewGmailSyncHistory = typeof gmailSyncHistory.$inferInsert;
+export type UserAccounts = typeof userAccounts.$inferSelect;
+export type NewUserAccounts = typeof userAccounts.$inferInsert;

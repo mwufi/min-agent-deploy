@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { emailMessages, gmailSyncHistory } from '@/lib/db/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
+import { getGmailAccounts as getGmailAccountsFromDB } from '@/lib/server/accounts-service';
 
 interface EmailThread {
   messageId: string;
@@ -23,11 +24,23 @@ export async function GET(req: NextRequest) {
 
     // Get account ID from query params
     const searchParams = req.nextUrl.searchParams;
-    const accountId = searchParams.get('accountId');
+    let accountId = searchParams.get('accountId');
     const forceSync = searchParams.get('sync') === 'true';
     
+    // If no account ID provided, try to get the default Gmail account
     if (!accountId) {
-      return NextResponse.json({ error: 'Account ID is required' }, { status: 400 });
+      const gmailAccounts = await getGmailAccountsFromDB(userId);
+      if (gmailAccounts.length > 0) {
+        accountId = gmailAccounts[0].id;
+        console.log(`Using default Gmail account: ${accountId}`);
+      } else {  
+        return NextResponse.json({ 
+          threads: [],
+          lastSync: null,
+          syncInProgress: false,
+          message: 'No Gmail accounts connected'
+        });
+      }
     }
 
     // Check if we need to sync
