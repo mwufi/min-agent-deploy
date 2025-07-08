@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { listThreads, getThread } from '@/lib/server/gmail_client';
 import { db } from '@/lib/db';
-import { emailThreads, emailMessages, gmailSyncHistory } from '@/lib/db/schema';
-import { eq, and, desc } from 'drizzle-orm';
-import pd from '@/lib/server/pipedream_client';
-import { randomUUID } from 'crypto';
+import { emailMessages, gmailSyncHistory } from '@/lib/db/schema';
+import { eq, and, desc, sql } from 'drizzle-orm';
 
 interface EmailThread {
   messageId: string;
@@ -13,49 +10,7 @@ interface EmailThread {
   subject: string;
   sender: string;
   time: string;
-  internalDate?: number; // For sorting purposes
-}
-
-interface Header {
-  name: string;
-  value: string;
-}
-
-function extractEmailParts(message: any) {
-  const headers: Header[] = message.payload?.headers || [];
-
-  const getHeader = (name: string) => headers.find((h: Header) => h.name === name)?.value || '';
-  const getHeaders = (name: string) => headers
-    .filter((h: Header) => h.name === name)
-    .map(h => h.value)
-    .filter(Boolean);
-
-  // Extract body content
-  let body = '';
-  let bodyHtml = '';
-
-  if (message.payload?.body?.data) {
-    body = Buffer.from(message.payload.body.data, 'base64').toString('utf-8');
-  } else if (message.payload?.parts) {
-    for (const part of message.payload.parts) {
-      if (part.mimeType === 'text/plain' && part.body?.data) {
-        body = Buffer.from(part.body.data, 'base64').toString('utf-8');
-      } else if (part.mimeType === 'text/html' && part.body?.data) {
-        bodyHtml = Buffer.from(part.body.data, 'base64').toString('utf-8');
-      }
-    }
-  }
-
-  return {
-    from: getHeader('From'),
-    to: getHeaders('To'),
-    cc: getHeaders('Cc'),
-    bcc: getHeaders('Bcc'),
-    subject: getHeader('Subject'),
-    date: getHeader('Date'),
-    body,
-    bodyHtml,
-  };
+  internalDate?: number;
 }
 
 export async function GET(req: NextRequest) {
@@ -66,209 +21,61 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get account ID from query params or use default
+    // Get account ID from query params
     const searchParams = req.nextUrl.searchParams;
     const accountId = searchParams.get('accountId');
-
+    const forceSync = searchParams.get('sync') === 'true';
+    
     if (!accountId) {
       return NextResponse.json({ error: 'Account ID is required' }, { status: 400 });
     }
 
-    // Start sync history
-    const syncId = randomUUID();
-    await db.insert(gmailSyncHistory).values({
-      id: syncId,
-      userId,
-      accountId,
-      historyId: '0', // Will be updated after sync
-      syncType: 'partial',
-      startedAt: new Date(),
-    });
-
-    // Get user's profile to fetch the latest history ID
-    let currentHistoryId = '0';
-    try {
-      const profileResponse = await pd.makeProxyRequest(
-        {
-          searchParams: {
-            account_id: accountId,
-            external_user_id: userId,
-          }
-        },
-        {
-          url: 'https://gmail.googleapis.com/gmail/v1/users/me/profile',
-          options: { method: "GET" }
-        }
-      );
-      
-      const profile = typeof profileResponse === 'string' 
-        ? JSON.parse(profileResponse) 
-        : profileResponse;
-      
-      currentHistoryId = profile.historyId || '0';
-    } catch (error) {
-      console.error('Error fetching Gmail profile:', error);
-      // Continue without history ID
-    }
-
-    // Fetch the 50 most recent threads from all folders (not just inbox)
-    const threadsResponse = await listThreads(
-      userId,
-      {
-        maxResults: 50,
-        // Remove 'in:inbox' to get threads from all folders
-        // Add query to exclude spam and trash by default
-        q: '-in:spam -in:trash'
-      },
-      accountId
-    );
-
-    const threads = threadsResponse.threads || [];
-    console.log('Threads response:', JSON.stringify(threadsResponse, null, 2));
-    console.log('Number of threads:', threads.length);
+    // Check if we need to sync
+    const shouldSync = await shouldPerformSync(userId, accountId, forceSync);
     
-    const fetchedThreads: EmailThread[] = [];
-    let messagesAdded = 0;
-
-    // Fetch details for each thread and persist to database
-    for (const thread of threads) {
-      if (!thread || !thread.id) {
-        console.warn('Skipping invalid thread:', thread);
-        continue;
-      }
-
-      const threadDetails = await getThread(userId, thread.id, accountId);
-      const messages = threadDetails.messages || [];
-      if (messages.length === 0) continue;
-
-      // Extract thread metadata from the first message
-      const firstMessage = messages[0];
-      const threadData = extractEmailParts(firstMessage);
+    if (shouldSync) {
+      // Trigger sync in the background
+      console.log('Triggering background sync for account:', accountId);
       
-      // Upsert thread
-      await db.insert(emailThreads).values({
-        id: randomUUID(),
-        threadId: thread.id,
-        userId,
-        accountId,
-        subject: threadData.subject || 'No Subject',
-        snippet: threadDetails.snippet || '',
-        historyId: firstMessage.historyId || currentHistoryId,
-        updatedAt: new Date(),
-      }).onConflictDoUpdate({
-        target: [emailThreads.threadId, emailThreads.accountId],
-        set: {
-          subject: threadData.subject || 'No Subject',
-          snippet: threadDetails.snippet || '',
-          historyId: firstMessage.historyId || currentHistoryId,
-          updatedAt: new Date(),
-        }
+      // Call sync endpoint without waiting for response
+      fetch(`${req.nextUrl.origin}/api/gmail/sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // Forward auth headers
+          'Cookie': req.headers.get('cookie') || '',
+        },
+        body: JSON.stringify({ accountId }),
+      }).catch(error => {
+        console.error('Background sync failed:', error);
       });
-
-      // Process all messages in the thread
-      let mostRecentMessage = null;
-      let mostRecentDate = 0;
-      
-      for (const message of messages) {
-        if (!message.id) continue;
-
-        const messageData = extractEmailParts(message);
-        const internalDate = message.internalDate 
-          ? new Date(parseInt(message.internalDate))
-          : new Date();
-
-        // Track most recent message
-        if (message.internalDate && parseInt(message.internalDate) > mostRecentDate) {
-          mostRecentDate = parseInt(message.internalDate);
-          mostRecentMessage = {
-            messageData,
-            message,
-            internalDate
-          };
-        }
-
-        // Extract sender name/email
-        const senderMatch = messageData.from.match(/^(?:"?([^"]+)"?\s)?<?([^>]+)>?$/);
-        const senderName = senderMatch ? (senderMatch[1] || senderMatch[2]) : messageData.from;
-
-        // Upsert message
-        await db.insert(emailMessages).values({
-          id: randomUUID(),
-          messageId: message.id,
-          threadId: thread.id,
-          userId,
-          accountId,
-          from: senderName,
-          to: messageData.to,
-          cc: messageData.cc,
-          bcc: messageData.bcc,
-          subject: messageData.subject || 'No Subject',
-          snippet: message.snippet || '',
-          body: messageData.body,
-          bodyHtml: messageData.bodyHtml,
-          labelIds: message.labelIds || [],
-          isUnread: message.labelIds?.includes('UNREAD') || false,
-          historyId: message.historyId || currentHistoryId,
-          internalDate,
-          updatedAt: new Date(),
-        }).onConflictDoUpdate({
-          target: [emailMessages.messageId, emailMessages.accountId],
-          set: {
-            from: senderName,
-            to: messageData.to,
-            cc: messageData.cc,
-            bcc: messageData.bcc,
-            subject: messageData.subject || 'No Subject',
-            snippet: message.snippet || '',
-            body: messageData.body,
-            bodyHtml: messageData.bodyHtml,
-            labelIds: message.labelIds || [],
-            isUnread: message.labelIds?.includes('UNREAD') || false,
-            historyId: message.historyId || currentHistoryId,
-            internalDate,
-            updatedAt: new Date(),
-          }
-        });
-
-        messagesAdded++;
-      }
-
-      // Use the most recent message for the thread display
-      if (mostRecentMessage) {
-        const { messageData, message, internalDate } = mostRecentMessage;
-        const senderMatch = messageData.from.match(/^(?:"?([^"]+)"?\s)?<?([^>]+)>?$/);
-        const sender = senderMatch ? (senderMatch[1] || senderMatch[2]) : messageData.from;
-
-        fetchedThreads.push({
-          messageId: message.id || '',
-          threadId: thread.id,
-          subject: messageData.subject || 'No Subject',
-          sender,
-          time: internalDate.toISOString(),
-          internalDate: mostRecentDate
-        });
-        
-        console.log(`[${thread.id}] ${messageData.subject} from ${sender} at ${internalDate.toISOString()}`);
-      }
     }
 
-    // Update sync history with results
-    await db.update(gmailSyncHistory)
-      .set({
-        historyId: currentHistoryId,
-        messagesAdded,
-        completedAt: new Date(),
+    // Always fetch from database for fast response
+    const threads = await fetchThreadsFromDB(userId, accountId);
+    
+    // Get last sync info
+    const lastSync = await db
+      .select({
+        completedAt: gmailSyncHistory.completedAt,
+        historyId: gmailSyncHistory.historyId,
+        messagesAdded: gmailSyncHistory.messagesAdded,
       })
-      .where(eq(gmailSyncHistory.id, syncId));
-
-    // Sort threads by most recent message date (descending)
-    fetchedThreads.sort((a, b) => (b.internalDate || 0) - (a.internalDate || 0));
+      .from(gmailSyncHistory)
+      .where(
+        and(
+          eq(gmailSyncHistory.userId, userId),
+          eq(gmailSyncHistory.accountId, accountId),
+          sql`${gmailSyncHistory.completedAt} IS NOT NULL`
+        )
+      )
+      .orderBy(desc(gmailSyncHistory.completedAt))
+      .limit(1);
 
     return NextResponse.json({ 
-      threads: fetchedThreads,
-      syncId,
-      historyId: currentHistoryId,
-      messagesStored: messagesAdded
+      threads,
+      lastSync: lastSync[0] || null,
+      syncInProgress: shouldSync,
     });
   } catch (error) {
     console.error('Error fetching Gmail threads:', error);
@@ -277,4 +84,86 @@ export async function GET(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+async function shouldPerformSync(
+  userId: string, 
+  accountId: string, 
+  forceSync: boolean
+): Promise<boolean> {
+  if (forceSync) return true;
+
+  // Check last successful sync
+  const lastSync = await db
+    .select({
+      completedAt: gmailSyncHistory.completedAt,
+    })
+    .from(gmailSyncHistory)
+    .where(
+      and(
+        eq(gmailSyncHistory.userId, userId),
+        eq(gmailSyncHistory.accountId, accountId),
+        sql`${gmailSyncHistory.completedAt} IS NOT NULL`,
+        sql`${gmailSyncHistory.error} IS NULL`
+      )
+    )
+    .orderBy(desc(gmailSyncHistory.completedAt))
+    .limit(1);
+
+  if (!lastSync[0]) {
+    // Never synced before
+    return true;
+  }
+
+  // Check if last sync was more than 5 minutes ago
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+  return lastSync[0].completedAt < fiveMinutesAgo;
+}
+
+async function fetchThreadsFromDB(
+  userId: string,
+  accountId: string
+): Promise<EmailThread[]> {
+  // Get most recent message per thread
+  const recentMessages = await db
+    .select({
+      messageId: emailMessages.messageId,
+      threadId: emailMessages.threadId,
+      subject: emailMessages.subject,
+      sender: emailMessages.from,
+      time: emailMessages.internalDate,
+      internalDate: sql<number>`EXTRACT(EPOCH FROM ${emailMessages.internalDate}) * 1000`,
+    })
+    .from(emailMessages)
+    .where(
+      and(
+        eq(emailMessages.userId, userId),
+        eq(emailMessages.accountId, accountId)
+      )
+    )
+    .orderBy(desc(emailMessages.internalDate))
+    .limit(200); // Get more to ensure we have enough threads
+
+  // Group by thread and get most recent message
+  const threadMap = new Map<string, EmailThread>();
+  
+  for (const message of recentMessages) {
+    if (!threadMap.has(message.threadId)) {
+      threadMap.set(message.threadId, {
+        messageId: message.messageId,
+        threadId: message.threadId,
+        subject: message.subject || 'No Subject',
+        sender: message.sender || 'Unknown Sender',
+        time: message.time?.toISOString() || new Date().toISOString(),
+        internalDate: Number(message.internalDate) || 0,
+      });
+    }
+  }
+
+  // Convert to array and sort by date
+  const threads = Array.from(threadMap.values())
+    .sort((a, b) => (b.internalDate || 0) - (a.internalDate || 0))
+    .slice(0, 50); // Return top 50 threads
+
+  return threads;
 }
