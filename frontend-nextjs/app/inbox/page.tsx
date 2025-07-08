@@ -20,11 +20,11 @@ function formatEmailTime(dateString: string): string {
   try {
     // Handle both ISO strings and locale strings
     const date = new Date(dateString);
-    
+
     if (isNaN(date.getTime())) {
       return dateString;
     }
-    
+
     if (isToday(date)) {
       return format(date, 'h:mm a');
     } else if (isYesterday(date)) {
@@ -32,7 +32,7 @@ function formatEmailTime(dateString: string): string {
     } else {
       const now = new Date();
       const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-      
+
       if (diffInDays < 7) {
         return format(date, 'EEE');
       } else if (diffInDays < 365) {
@@ -168,7 +168,7 @@ export default function InboxPage() {
         </div>
       </div>
 
-      <div className="rounded-lg border bg-card">
+      <div className="rounded-lg bg-card">
         {threads.length === 0 ? (
           <div className="p-8 text-center">
             <Mail className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -178,11 +178,11 @@ export default function InboxPage() {
             </p>
           </div>
         ) : (
-          <div className="divide-y">
+          <div className="divide-y divide-border/50">
             {threads.map((thread) => (
               <div
                 key={thread.threadId}
-                className="flex items-center space-x-4 p-4 hover:bg-accent/50 transition-colors"
+                className="flex items-center space-x-4 px-4 py-2 hover:bg-accent/50 transition-colors"
               >
                 <Checkbox
                   checked={selectedThreads.has(thread.threadId)}
@@ -197,15 +197,15 @@ export default function InboxPage() {
                   {starredThreads.has(thread.threadId) ? (
                     <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                   ) : (
-                    <StarOff className="h-4 w-4 text-muted-foreground" />
+                    <Star className="h-4 w-4 text-muted-foreground" />
                   )}
                 </Button>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline space-x-2">
-                    <span className="font-medium truncate">{thread.sender}</span>
-                  </div>
-                  <div className="text-sm text-muted-foreground truncate">
-                    {truncateSubject(thread.subject)}
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium truncate flex-shrink-0">{thread.sender}</span>
+                    <span className="text-sm text-muted-foreground truncate">
+                      {truncateSubject(thread.subject)}
+                    </span>
                   </div>
                 </div>
                 <div className="text-sm text-muted-foreground whitespace-nowrap">
