@@ -6,8 +6,10 @@ export interface EmailThread {
   subject: string;
   sender: string;
   senderEmail?: string;
+  snippet?: string;
   time: string;
   internalDate?: number; // For sorting purposes
+  messageCount: number;
 }
 
 interface UseGmailThreadsOptions {

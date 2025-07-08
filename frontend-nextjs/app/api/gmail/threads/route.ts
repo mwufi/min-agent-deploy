@@ -11,8 +11,10 @@ interface EmailThread {
   subject: string;
   sender: string;
   senderEmail?: string;
+  snippet?: string;
   time: string;
   internalDate?: number;
+  messageCount: number;
 }
 
 export async function GET(req: NextRequest) {
@@ -138,48 +140,68 @@ async function fetchThreadsFromDB(
   userId: string,
   accountId: string
 ): Promise<EmailThread[]> {
-  // Get most recent message per thread
-  const recentMessages = await db
-    .select({
-      messageId: emailMessages.messageId,
-      threadId: emailMessages.threadId,
-      subject: emailMessages.subject,
-      sender: emailMessages.from,
-      senderEmail: emailMessages.fromEmail,
-      time: emailMessages.internalDate,
-      internalDate: sql<number>`EXTRACT(EPOCH FROM ${emailMessages.internalDate}) * 1000`,
-    })
-    .from(emailMessages)
-    .where(
-      and(
-        eq(emailMessages.userId, userId),
-        eq(emailMessages.accountId, accountId)
-      )
+  // Get thread aggregates with latest message info and message count
+  const threadData = await db.execute(sql`
+    WITH thread_stats AS (
+      SELECT 
+        thread_id,
+        COUNT(*) as message_count,
+        MAX(internal_date) as latest_date
+      FROM email_messages
+      WHERE user_id = ${userId}
+        AND account_id = ${accountId}
+      GROUP BY thread_id
+    ),
+    latest_messages AS (
+      SELECT DISTINCT ON (em.thread_id)
+        em.message_id,
+        em.thread_id,
+        em.subject,
+        em."from" as sender,
+        em.from_email as sender_email,
+        em.snippet,
+        em.internal_date,
+        ts.message_count
+      FROM email_messages em
+      INNER JOIN thread_stats ts ON em.thread_id = ts.thread_id
+      WHERE em.user_id = ${userId}
+        AND em.account_id = ${accountId}
+        AND em.internal_date = ts.latest_date
+      ORDER BY em.thread_id, em.internal_date DESC
     )
-    .orderBy(desc(emailMessages.internalDate))
-    .limit(200); // Get more to ensure we have enough threads
+    SELECT 
+      message_id,
+      thread_id,
+      subject,
+      sender,
+      sender_email,
+      snippet,
+      internal_date,
+      message_count,
+      EXTRACT(EPOCH FROM internal_date) * 1000 as internal_date_ms
+    FROM latest_messages
+    ORDER BY internal_date DESC
+    LIMIT 50
+  `);
 
-  // Group by thread and get most recent message
-  const threadMap = new Map<string, EmailThread>();
-  
-  for (const message of recentMessages) {
-    if (!threadMap.has(message.threadId)) {
-      threadMap.set(message.threadId, {
-        messageId: message.messageId,
-        threadId: message.threadId,
-        subject: message.subject || 'No Subject',
-        sender: message.sender || 'Unknown Sender',
-        senderEmail: message.senderEmail || undefined,
-        time: message.time?.toISOString() || new Date().toISOString(),
-        internalDate: Number(message.internalDate) || 0,
-      });
-    }
-  }
-
-  // Convert to array and sort by date
-  const threads = Array.from(threadMap.values())
-    .sort((a, b) => (b.internalDate || 0) - (a.internalDate || 0))
-    .slice(0, 50); // Return top 50 threads
+  // Process and clean up the subjects
+  const threads: EmailThread[] = (threadData.rows || threadData).map((row: any) => {
+    // Remove "Re: " prefix from subjects
+    let cleanSubject = row.subject || 'No Subject';
+    cleanSubject = cleanSubject.replace(/^(Re:\s*)+/gi, '').trim();
+    
+    return {
+      messageId: row.message_id,
+      threadId: row.thread_id,
+      subject: cleanSubject,
+      sender: row.sender || 'Unknown Sender',
+      senderEmail: row.sender_email || undefined,
+      snippet: row.snippet || '',
+      time: row.internal_date ? new Date(row.internal_date).toISOString() : new Date().toISOString(),
+      internalDate: Number(row.internal_date_ms) || 0,
+      messageCount: Number(row.message_count) || 1,
+    };
+  });
 
   return threads;
 }

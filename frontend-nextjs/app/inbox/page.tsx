@@ -52,10 +52,6 @@ function formatEmailTime(dateString: string): string {
   }
 }
 
-function truncateSubject(subject: string, maxLength: number = 80): string {
-  if (subject.length <= maxLength) return subject;
-  return subject.substring(0, maxLength - 3) + '...';
-}
 
 export default function InboxPage() {
   const { data: accountsData, isLoading: accountsLoading } = useGmailAccounts();
@@ -189,7 +185,7 @@ export default function InboxPage() {
             {threads.map((thread) => (
               <div
                 key={thread.threadId}
-                className="flex items-center space-x-4 px-4 py-2 hover:bg-accent/50 transition-colors"
+                className="flex items-center space-x-3 px-4 py-3 cursor-pointer hover:bg-accent/50 transition-colors"
               >
                 <Checkbox
                   checked={selectedThreads.has(thread.threadId)}
@@ -207,22 +203,28 @@ export default function InboxPage() {
                     <Star className="h-4 w-4 text-muted-foreground" />
                   )}
                 </Button>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-2">
+                <div className="flex items-center min-w-0 flex-1">
+                  <div className="flex items-center space-x-1.5 w-48 flex-shrink-0">
                     {thread.senderEmail ? (
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <span className="font-medium truncate flex-shrink-0 cursor-help">{thread.sender}</span>
+                          <span className="text-sm font-medium truncate cursor-help">{thread.sender}</span>
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>{thread.senderEmail}</p>
                         </TooltipContent>
                       </Tooltip>
                     ) : (
-                      <span className="font-medium truncate flex-shrink-0">{thread.sender}</span>
+                      <span className="text-sm font-medium truncate">{thread.sender}</span>
                     )}
+                    {thread.messageCount > 1 && (
+                      <span className="text-xs text-muted-foreground">({thread.messageCount})</span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0 flex items-center px-4">
+                    <span className="text-sm font-medium mr-1.5 shrink-0">{thread.subject}</span>
                     <span className="text-sm text-muted-foreground truncate">
-                      {truncateSubject(thread.subject)}
+                      {thread.snippet || ''}
                     </span>
                   </div>
                 </div>
