@@ -29,10 +29,17 @@ const navigation = [
 
 const conditionalNavigation = [
     {
-        name: "Mail Setup",
-        href: "/mail",
+        name: "Inbox",
+        href: "/inbox",
         icon: EnvelopeIcon,
         activeIcon: EnvelopeIconSolid,
+        condition: (accounts: any[]) => accounts.some(acc => acc.app.name_slug === "gmail")
+    },
+    {
+        name: "Mail Setup",
+        href: "/mail",
+        icon: Cog6ToothIcon,
+        activeIcon: Cog6ToothIconSolid,
         condition: (accounts: any[]) => accounts.some(acc => acc.app.name_slug === "gmail")
     },
 ];

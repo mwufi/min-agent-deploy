@@ -6,6 +6,7 @@ export interface EmailThread {
   subject: string;
   sender: string;
   time: string;
+  internalDate?: number; // For sorting purposes
 }
 
 interface UseGmailThreadsOptions {
@@ -20,7 +21,7 @@ export function useGmailThreads(options?: UseGmailThreadsOptions) {
       if (options?.accountId) {
         params.append('accountId', options.accountId);
       }
-      
+
       const response = await fetch(`/api/gmail/threads?${params.toString()}`);
       if (!response.ok) {
         throw new Error('Failed to fetch Gmail threads');

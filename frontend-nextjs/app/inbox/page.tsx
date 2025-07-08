@@ -18,7 +18,12 @@ import {
 
 function formatEmailTime(dateString: string): string {
   try {
-    const date = parseISO(dateString);
+    // Handle both ISO strings and locale strings
+    const date = new Date(dateString);
+    
+    if (isNaN(date.getTime())) {
+      return dateString;
+    }
     
     if (isToday(date)) {
       return format(date, 'h:mm a');
@@ -48,7 +53,7 @@ function truncateSubject(subject: string, maxLength: number = 80): string {
 
 export default function InboxPage() {
   const { data: accountsData, isLoading: accountsLoading } = useGmailAccounts();
-  const defaultAccount = accountsData?.accounts?.[0];
+  const defaultAccount = accountsData?.[0];
   const { data, isLoading, error } = useGmailThreads({ accountId: defaultAccount?.id });
   const [selectedThreads, setSelectedThreads] = useState<Set<string>>(new Set());
   const [starredThreads, setStarredThreads] = useState<Set<string>>(new Set());
@@ -113,7 +118,7 @@ export default function InboxPage() {
     );
   }
 
-  if (!accountsData?.accounts?.length) {
+  if (!accountsData?.length) {
     return (
       <div className="flex-1 space-y-4 p-8 pt-6">
         <div>
