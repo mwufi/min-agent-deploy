@@ -3,7 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { listThreads, getThread } from '@/lib/server/gmail_client';
 import { db } from '@/lib/db';
 import { emailThreads, emailMessages, gmailSyncHistory } from '@/lib/db/schema';
-import { eq, and, desc, inArray } from 'drizzle-orm';
+import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 import pd from '@/lib/server/pipedream_client';
 
 interface Header {
@@ -11,9 +11,15 @@ interface Header {
   value: string;
 }
 
+interface GmailThread {
+  id?: string;
+  snippet?: string;
+  historyId?: string;
+}
+
 function extractEmailParts(message: any) {
   const headers: Header[] = message.payload?.headers || [];
-  
+
   const getHeader = (name: string) => headers.find((h: Header) => h.name === name)?.value || '';
   const getHeaders = (name: string) => headers
     .filter((h: Header) => h.name === name)
@@ -23,7 +29,7 @@ function extractEmailParts(message: any) {
   // Extract body content
   let body = '';
   let bodyHtml = '';
-  
+
   if (message.payload?.body?.data) {
     body = Buffer.from(message.payload.body.data, 'base64').toString('utf-8');
   } else if (message.payload?.parts) {
@@ -51,7 +57,7 @@ function extractEmailParts(message: any) {
 export async function POST(req: NextRequest) {
   try {
     const { userId } = await auth();
-    
+
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -59,7 +65,7 @@ export async function POST(req: NextRequest) {
     // Get account ID from body or query params
     const body = await req.json().catch(() => ({}));
     const accountId = body.accountId || req.nextUrl.searchParams.get('accountId');
-    
+
     if (!accountId) {
       return NextResponse.json({ error: 'Account ID is required' }, { status: 400 });
     }
@@ -90,11 +96,11 @@ export async function POST(req: NextRequest) {
           options: { method: "GET" }
         }
       );
-      
-      const profile = typeof profileResponse === 'string' 
-        ? JSON.parse(profileResponse) 
+
+      const profile = typeof profileResponse === 'string'
+        ? JSON.parse(profileResponse)
         : profileResponse;
-      
+
       currentHistoryId = profile.historyId || '0';
     } catch (error) {
       console.error('Error fetching Gmail profile:', error);
@@ -115,23 +121,24 @@ export async function POST(req: NextRequest) {
     let messagesAdded = 0;
     const processedThreadIds: string[] = [];
 
-    // Process each thread
-    for (const thread of threads) {
-      if (!thread.id) continue;
+    // Collect all threads and messages for batch processing
+    const allThreadsData = [];
+    const allMessagesData = [];
+
+    // Helper function to process a single thread
+    const processThread = async (thread: GmailThread): Promise<any> => {
+      if (!thread.id) return null;
 
       const threadDetails = await getThread(userId, thread.id, accountId);
       const messages = threadDetails.messages || [];
-      
-      if (messages.length === 0) continue;
+
+      if (messages.length === 0) return null;
 
       // Extract thread metadata from the first message
       const firstMessage = messages[0];
       const threadData = extractEmailParts(firstMessage);
-      
-      processedThreadIds.push(thread.id);
 
-      // Upsert thread
-      await db.insert(emailThreads).values({
+      const threadInfo = {
         id: crypto.randomUUID(),
         threadId: thread.id,
         userId,
@@ -140,22 +147,14 @@ export async function POST(req: NextRequest) {
         snippet: threadDetails.snippet || '',
         historyId: firstMessage.historyId || currentHistoryId,
         updatedAt: new Date(),
-      }).onConflictDoUpdate({
-        target: [emailThreads.threadId, emailThreads.accountId],
-        set: {
-          subject: threadData.subject || 'No Subject',
-          snippet: threadDetails.snippet || '',
-          historyId: firstMessage.historyId || currentHistoryId,
-          updatedAt: new Date(),
-        }
-      });
+      };
 
-      // Process all messages in the thread
+      const messagesInfo = [];
       for (const message of messages) {
         if (!message.id) continue;
 
         const messageData = extractEmailParts(message);
-        const internalDate = message.internalDate 
+        const internalDate = message.internalDate
           ? new Date(parseInt(message.internalDate))
           : new Date();
 
@@ -163,8 +162,7 @@ export async function POST(req: NextRequest) {
         const senderMatch = messageData.from.match(/^(?:"?([^"]+)"?\s)?<?([^>]+)>?$/);
         const senderName = senderMatch ? (senderMatch[1] || senderMatch[2]) : messageData.from;
 
-        // Upsert message
-        await db.insert(emailMessages).values({
+        messagesInfo.push({
           id: crypto.randomUUID(),
           messageId: message.id,
           threadId: thread.id,
@@ -183,27 +181,80 @@ export async function POST(req: NextRequest) {
           historyId: message.historyId || currentHistoryId,
           internalDate,
           updatedAt: new Date(),
-        }).onConflictDoUpdate({
-          target: [emailMessages.messageId, emailMessages.accountId],
-          set: {
-            from: senderName,
-            to: messageData.to,
-            cc: messageData.cc,
-            bcc: messageData.bcc,
-            subject: messageData.subject || 'No Subject',
-            snippet: message.snippet || '',
-            body: messageData.body,
-            bodyHtml: messageData.bodyHtml,
-            labelIds: message.labelIds || [],
-            isUnread: message.labelIds?.includes('UNREAD') || false,
-            historyId: message.historyId || currentHistoryId,
-            internalDate,
-            updatedAt: new Date(),
-          }
         });
-
-        messagesAdded++;
       }
+
+      return { threadInfo, messagesInfo };
+    };
+
+    // Process threads in batches of 10
+    const batchSize = 10;
+    for (let i = 0; i < threads.length; i += batchSize) {
+      const batch = threads.slice(i, i + batchSize);
+
+      // Fetch thread details in parallel for this batch
+      const batchResults = await Promise.all(
+        batch.map((thread: GmailThread) => processThread(thread))
+      );
+
+      // Collect results from this batch
+      for (const result of batchResults) {
+        if (result) {
+          processedThreadIds.push(result.threadInfo.threadId);
+          allThreadsData.push(result.threadInfo);
+          allMessagesData.push(...result.messagesInfo);
+        }
+      }
+    }
+
+    // Batch check existing messages
+    const messageIds = allMessagesData.map(m => m.messageId);
+    const existingMessages = await db
+      .select({ messageId: emailMessages.messageId })
+      .from(emailMessages)
+      .where(
+        and(
+          eq(emailMessages.accountId, accountId),
+          inArray(emailMessages.messageId, messageIds)
+        )
+      );
+
+    const existingMessageIds = new Set(existingMessages.map(m => m.messageId));
+    messagesAdded = allMessagesData.filter(m => !existingMessageIds.has(m.messageId)).length;
+
+    // Batch upsert threads
+    if (allThreadsData.length > 0) {
+      await db.insert(emailThreads).values(allThreadsData).onConflictDoUpdate({
+        target: [emailThreads.threadId, emailThreads.accountId],
+        set: {
+          subject: sql`excluded.subject`,
+          snippet: sql`excluded.snippet`,
+          historyId: sql`excluded.history_id`,
+          updatedAt: sql`excluded.updated_at`,
+        }
+      });
+    }
+
+    // Batch upsert messages
+    if (allMessagesData.length > 0) {
+      await db.insert(emailMessages).values(allMessagesData).onConflictDoUpdate({
+        target: [emailMessages.messageId, emailMessages.accountId],
+        set: {
+          from: sql`excluded.from`,
+          to: sql`excluded.to`,
+          cc: sql`excluded.cc`,
+          bcc: sql`excluded.bcc`,
+          subject: sql`excluded.subject`,
+          snippet: sql`excluded.snippet`,
+          body: sql`excluded.body`,
+          bodyHtml: sql`excluded.body_html`,
+          labelIds: sql`excluded.label_ids`,
+          isUnread: sql`excluded.is_unread`,
+          historyId: sql`excluded.history_id`,
+          internalDate: sql`excluded.internal_date`,
+          updatedAt: sql`excluded.updated_at`,
+        }
+      });
     }
 
     // Update sync history with results
@@ -238,8 +289,8 @@ export async function POST(req: NextRequest) {
     // Get the most recent message from each thread
     const threadMap = new Map();
     for (const message of syncedThreads) {
-      if (!threadMap.has(message.threadId) || 
-          (message.time && threadMap.get(message.threadId).time < message.time)) {
+      if (!threadMap.has(message.threadId) ||
+        (message.time && threadMap.get(message.threadId).time < message.time)) {
         threadMap.set(message.threadId, message);
       }
     }
@@ -249,7 +300,7 @@ export async function POST(req: NextRequest) {
       time: thread.time?.toISOString() || new Date().toISOString(),
     }));
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       syncId,
       messagesAdded,
@@ -258,7 +309,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error('Error syncing Gmail threads:', error);
-    
+
     // Log error in sync history if we have a sync ID
     if (error instanceof Error && 'syncId' in error) {
       await db.update(gmailSyncHistory)
@@ -268,7 +319,7 @@ export async function POST(req: NextRequest) {
         })
         .where(eq(gmailSyncHistory.id, error.syncId as string));
     }
-    
+
     return NextResponse.json(
       { error: 'Failed to sync Gmail threads' },
       { status: 500 }
