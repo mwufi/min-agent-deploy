@@ -12,6 +12,8 @@ from rich.tree import Tree
 from loguru import logger
 import json
 
+from .live_display import LiveDisplay
+
 
 class TerminalUI:
     """Pretty terminal UI for agent operations"""

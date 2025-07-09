@@ -6,6 +6,7 @@ import asyncio
 from typing import Dict, List, Optional, Any, Union
 from pathlib import Path
 from datetime import datetime
+from contextlib import asynccontextmanager
 
 import httpx
 from loguru import logger
@@ -15,7 +16,7 @@ from ..storage.markdown import MarkdownStorage
 from ..behaviors.base import Behavior, BehaviorManager
 from ..behaviors.planning import PlanningBehavior
 from ..monitoring.metrics import MetricsCollector
-from ..ui.terminal import TerminalUI
+from ..ui.terminal import TerminalUI, LiveDisplay
 
 
 class ToolCall(BaseModel):
@@ -41,7 +42,8 @@ class A1:
         path: Union[str, Path] = "./data",
         llm: str = "anthropic/claude-3.5-sonnet",
         api_key: Optional[str] = None,
-        behaviors: Optional[List[Behavior]] = None
+        behaviors: Optional[List[Behavior]] = None,
+        enable_live_ui: bool = True
     ):
         self.path = Path(path)
         self.path.mkdir(parents=True, exist_ok=True)
@@ -55,12 +57,17 @@ class A1:
         self.storage = MarkdownStorage(self.path)
         self.metrics = MetricsCollector()
         self.ui = TerminalUI()
+        self.enable_live_ui = enable_live_ui
+        self._live_display: Optional[LiveDisplay] = None
         
         # Initialize behavior manager
         self.behavior_manager = BehaviorManager()
         if behaviors:
             for behavior in behaviors:
                 self.behavior_manager.register(behavior)
+                # Initialize behavior if it has an initialize method
+                if hasattr(behavior, 'initialize'):
+                    asyncio.create_task(behavior.initialize(self))
         else:
             # Default behaviors
             self.behavior_manager.register(PlanningBehavior())
@@ -71,7 +78,45 @@ class A1:
         # Available tools
         self.tools = self._initialize_tools()
         
+        # Start periodic tasks
+        self._periodic_task = None
+        
         logger.info(f"Agent initialized with storage at {self.path}")
+    
+    def has_behavior(self, requirement: str) -> bool:
+        """Check if agent has a behavior (convenience method)"""
+        return self.behavior_manager.has_behavior(requirement)
+    
+    def get_behavior(self, name: str) -> Optional[Behavior]:
+        """Get a behavior by name (convenience method)"""
+        return self.behavior_manager.get_behavior(name)
+    
+    async def start(self) -> None:
+        """Start the agent and all periodic behaviors"""
+        await self.behavior_manager.start_all_periodic_tasks(self)
+        
+        # Start live UI if enabled
+        if self.enable_live_ui and not self._live_display:
+            self._live_display = LiveDisplay(self)
+            await self._live_display.start()
+    
+    async def stop(self) -> None:
+        """Stop the agent and all periodic behaviors"""
+        await self.behavior_manager.stop_all_periodic_tasks()
+        
+        # Stop live UI
+        if self._live_display:
+            await self._live_display.stop()
+            self._live_display = None
+    
+    @asynccontextmanager
+    async def session(self):
+        """Context manager for agent session"""
+        await self.start()
+        try:
+            yield self
+        finally:
+            await self.stop()
     
     def _initialize_tools(self) -> List[Dict[str, Any]]:
         """Initialize available tools for the agent"""
@@ -193,12 +238,19 @@ class A1:
             duration = (datetime.now() - start_time).total_seconds()
             self.metrics.record_tool_call(function_name, duration, success=True)
             
+            # Notify behaviors
+            await self.behavior_manager.on_tool_call(function_name, arguments, result, self)
+            
             return result
             
         except Exception as e:
             duration = (datetime.now() - start_time).total_seconds()
-            self.metrics.record_tool_call(function_name, duration, success=False)
+            self.metrics.record_tool_call(function_name, duration, success=False, error=str(e))
             logger.error(f"Tool execution error: {e}")
+            
+            # Notify behaviors of error
+            await self.behavior_manager.on_error(e, self)
+            
             return f"Error: {str(e)}"
     
     async def _process_response(self, response: Dict[str, Any]) -> Optional[str]:
@@ -244,11 +296,14 @@ class A1:
         """Async version of go()"""
         self.ui.log_user_input(prompt)
         
+        # Notify behaviors of user message
+        await self.behavior_manager.on_user_message(prompt, self)
+        
         # Pre-process with behaviors
-        prompt = await self.behavior_manager.pre_process(prompt, self)
+        processed_prompt = await self.behavior_manager.pre_process(prompt, self)
         
         # Add user message
-        self.messages.append(Message(role="user", content=prompt))
+        self.messages.append(Message(role="user", content=processed_prompt))
         
         # Convert messages to dict format
         messages_dict = [msg.model_dump(exclude_none=True) for msg in self.messages]
@@ -271,4 +326,5 @@ class A1:
         except Exception as e:
             logger.error(f"Error in agent execution: {e}")
             self.ui.log_error(str(e))
+            await self.behavior_manager.on_error(e, self)
             raise
