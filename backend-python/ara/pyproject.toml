@@ -1,0 +1,26 @@
+[project]
+name = "ara"
+version = "0.1.0"
+description = "AI Agent with Memory - A modular agent framework with markdown-based storage"
+readme = "README.md"
+authors = [
+    { name = "Zen T", email = "ztang230@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "aiofiles>=24.1.0",
+    "httpx>=0.28.1",
+    "loguru>=0.7.3",
+    "openai>=1.93.3",
+    "pydantic>=2.11.7",
+    "pyyaml>=6.0.2",
+    "rich>=14.0.0",
+    "watchdog>=6.0.0",
+]
+
+[project.scripts]
+ara = "ara:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
