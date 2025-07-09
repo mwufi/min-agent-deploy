@@ -16,10 +16,11 @@ async def main():
     
     # Initialize agent with behaviors
     agent = A1(
-        path='./behavior-demo-data',
+        path='./dev-behavior-demo-data',
         llm='anthropic/claude-3.5-sonnet',
         behaviors=[user_modeling],
-        enable_live_ui=True  # Enable live monitoring UI
+        enable_live_ui=True,  # Enable live monitoring UI
+        ui_backend='textual'  # Use new Textual UI with better keystroke handling
     )
     
     # Initialize the user modeling behavior
@@ -76,7 +77,7 @@ async def main():
         for tool, summary in tool_metrics.items():
             print(f"  {tool}: {summary.count} calls, avg {summary.avg_duration:.2f}s")
         
-        print("\n✨ Check the ./behavior-demo-data/user_model/ directory to see the stored user model!")
+        print("\n✨ Check the ./dev-behavior-demo-data/user_model/ directory to see the stored user model!")
         
         # Keep the UI running for a bit to explore
         print("\n⏸️  Keeping UI open for 30 seconds... (Press Ctrl+C to exit)")

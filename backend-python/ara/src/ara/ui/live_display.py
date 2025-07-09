@@ -40,6 +40,9 @@ class LiveDisplay:
         self.live = Live(self.layout, refresh_per_second=2, screen=True)
         self.live.start()
         
+        # Add loguru handler to capture logs
+        self._setup_log_handler()
+        
         # Start update loop
         self._update_task = asyncio.create_task(self._update_loop())
         logger.info("Started live display")
@@ -60,6 +63,10 @@ class LiveDisplay:
         
         if self.live:
             self.live.stop()
+        
+        # Remove log handler
+        if hasattr(self, '_log_handler_id') and self._log_handler_id:
+            logger.remove(self._log_handler_id)
         
         logger.info("Stopped live display")
     
@@ -288,3 +295,18 @@ class LiveDisplay:
         self.log_buffer.append(f"[{timestamp}] {message}")
         if len(self.log_buffer) > self.max_log_lines * 2:
             self.log_buffer = self.log_buffer[-self.max_log_lines:]
+    
+    def _setup_log_handler(self) -> None:
+        """Set up loguru handler to capture logs"""
+        def log_sink(message):
+            """Custom sink to capture log messages"""
+            # Extract just the message part without the loguru formatting
+            self.add_log(message.record["message"])
+        
+        # Add handler and store ID for removal later
+        self._log_handler_id = logger.add(
+            log_sink,
+            format="{message}",
+            level="INFO",
+            colorize=False
+        )

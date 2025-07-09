@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 from enum import Enum
 import uuid
-from loguru import logger
+from ..logging import get_logger
 from packaging import version
 
 if TYPE_CHECKING:
@@ -39,7 +39,8 @@ class Activity:
         """Add a log message to this activity"""
         timestamp = datetime.now().isoformat()
         self.logs.append(f"[{timestamp}] {message}")
-        logger.debug(f"[{self.behavior_name}/{self.name}] {message}")
+        logger = get_logger(__name__, behavior=self.behavior_name, activity=self.name)
+        logger.debug(message)
     
     @property
     def duration(self) -> Optional[timedelta]:
@@ -60,6 +61,7 @@ class Behavior(ABC):
         self.interval: Optional[float] = None  # Seconds between periodic runs
         self.activities: Dict[str, Activity] = {}
         self._periodic_task: Optional[asyncio.Task] = None
+        self.logger = get_logger(__name__, behavior=name)
     
     @property
     def full_name(self) -> str:
@@ -100,14 +102,14 @@ class Behavior(ABC):
         """Start periodic execution of this behavior"""
         if self.interval and not self._periodic_task:
             self._periodic_task = asyncio.create_task(self._periodic_loop(agent))
-            logger.info(f"Started periodic execution for {self.name} every {self.interval}s")
+            self.logger.info(f"Started periodic execution for {self.name} every {self.interval}s")
     
     async def stop_periodic_execution(self) -> None:
         """Stop periodic execution"""
         if self._periodic_task:
             self._periodic_task.cancel()
             self._periodic_task = None
-            logger.info(f"Stopped periodic execution for {self.name}")
+            self.logger.info(f"Stopped periodic execution for {self.name}")
     
     async def _periodic_loop(self, agent: "A1") -> None:
         """Internal periodic execution loop"""
@@ -120,7 +122,7 @@ class Behavior(ABC):
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Error in {self.name} periodic task: {e}")
+                self.logger.error(f"Error in {self.name} periodic task: {e}")
     
     @abstractmethod
     async def pre_process(self, prompt: str, agent: "A1") -> str:
@@ -155,11 +157,12 @@ class BehaviorManager:
     def __init__(self):
         self.behaviors: Dict[str, Behavior] = {}
         self._running_activities: Set[Activity] = set()
+        self.logger = get_logger(__name__, context="behavior_manager")
     
     def register(self, behavior: Behavior) -> None:
         """Register a new behavior"""
         self.behaviors[behavior.name] = behavior
-        logger.info(f"Registered behavior: {behavior.full_name}")
+        self.logger.info(f"Registered behavior: {behavior.full_name}")
     
     def unregister(self, behavior_name: str) -> None:
         """Unregister a behavior by name"""
@@ -235,7 +238,7 @@ class BehaviorManager:
                 try:
                     prompt = await behavior.pre_process(prompt, agent)
                 except Exception as e:
-                    logger.error(f"Error in {behavior.name} pre_process: {e}")
+                    self.logger.error(f"Error in {behavior.name} pre_process: {e}")
         return prompt
     
     async def post_process(self, response: str, agent: "A1") -> str:
@@ -245,7 +248,7 @@ class BehaviorManager:
                 try:
                     response = await behavior.post_process(response, agent)
                 except Exception as e:
-                    logger.error(f"Error in {behavior.name} post_process: {e}")
+                    self.logger.error(f"Error in {behavior.name} post_process: {e}")
         return response
     
     async def on_tool_call(self, tool_name: str, args: dict, result: Any, agent: "A1") -> None:
@@ -255,7 +258,7 @@ class BehaviorManager:
                 try:
                     await behavior.on_tool_call(tool_name, args, result, agent)
                 except Exception as e:
-                    logger.error(f"Error in {behavior.name} on_tool_call: {e}")
+                    self.logger.error(f"Error in {behavior.name} on_tool_call: {e}")
     
     async def on_error(self, error: Exception, agent: "A1") -> None:
         """Notify all behaviors of an error"""
@@ -264,7 +267,7 @@ class BehaviorManager:
                 try:
                     await behavior.on_error(error, agent)
                 except Exception as e:
-                    logger.error(f"Error in {behavior.name} on_error: {e}")
+                    self.logger.error(f"Error in {behavior.name} on_error: {e}")
     
     async def on_user_message(self, message: str, agent: "A1") -> None:
         """Notify all behaviors of a user message"""
@@ -273,4 +276,4 @@ class BehaviorManager:
                 try:
                     await behavior.on_user_message(message, agent)
                 except Exception as e:
-                    logger.error(f"Error in {behavior.name} on_user_message: {e}")
+                    self.logger.error(f"Error in {behavior.name} on_user_message: {e}")

@@ -9,14 +9,17 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 
 import httpx
-from loguru import logger
 from pydantic import BaseModel, Field
+
+from ..logging import get_logger, setup_logging
 
 from ..storage.markdown import MarkdownStorage
 from ..behaviors.base import Behavior, BehaviorManager
 from ..behaviors.planning import PlanningBehavior
 from ..monitoring.metrics import MetricsCollector
-from ..ui.terminal import TerminalUI, LiveDisplay
+from ..ui.terminal import TerminalUI
+from ..ui.live_display import LiveDisplay
+from ..ui.textual_display import TextualDisplay
 
 
 class ToolCall(BaseModel):
@@ -43,7 +46,8 @@ class A1:
         llm: str = "anthropic/claude-3.5-sonnet",
         api_key: Optional[str] = None,
         behaviors: Optional[List[Behavior]] = None,
-        enable_live_ui: bool = True
+        enable_live_ui: bool = True,
+        ui_backend: str = "textual"  # "rich" or "textual"
     ):
         self.path = Path(path)
         self.path.mkdir(parents=True, exist_ok=True)
@@ -58,7 +62,12 @@ class A1:
         self.metrics = MetricsCollector()
         self.ui = TerminalUI()
         self.enable_live_ui = enable_live_ui
-        self._live_display: Optional[LiveDisplay] = None
+        self.ui_backend = ui_backend
+        self._live_display: Optional[Union[LiveDisplay, TextualDisplay]] = None
+        
+        # Setup logging with file output in agent's data directory
+        setup_logging(log_dir=self.path / "logs", enable_file_logging=True)
+        self.logger = get_logger(__name__, context="agent")
         
         # Initialize behavior manager
         self.behavior_manager = BehaviorManager()
@@ -81,7 +90,7 @@ class A1:
         # Start periodic tasks
         self._periodic_task = None
         
-        logger.info(f"Agent initialized with storage at {self.path}")
+        self.logger.info(f"Agent initialized with storage at {self.path}")
     
     def has_behavior(self, requirement: str) -> bool:
         """Check if agent has a behavior (convenience method)"""
@@ -97,7 +106,10 @@ class A1:
         
         # Start live UI if enabled
         if self.enable_live_ui and not self._live_display:
-            self._live_display = LiveDisplay(self)
+            if self.ui_backend == "textual":
+                self._live_display = TextualDisplay(self)
+            else:
+                self._live_display = LiveDisplay(self)
             await self._live_display.start()
     
     async def stop(self) -> None:
