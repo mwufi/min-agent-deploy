@@ -1,6 +1,7 @@
 """Textual-based live terminal display for monitoring behaviors and activities"""
 
 import asyncio
+import json
 from typing import TYPE_CHECKING, Optional, List
 from datetime import datetime
 from textual.app import App, ComposeResult
@@ -14,6 +15,50 @@ from ..logging import log_router, get_logger, LogMessage
 if TYPE_CHECKING:
     from ..agent.core import A1
     from ..behaviors.base import Activity, ActivityStatus
+
+
+class AgentInfoWidget(Static):
+    """Widget for displaying agent information and LLM prompts"""
+    
+    def __init__(self, agent: "A1", **kwargs):
+        super().__init__(**kwargs)
+        self.agent = agent
+        self.border_title = "🤖 Agent Info"
+        self.last_messages = []
+    
+    def on_mount(self) -> None:
+        """Set up periodic updates"""
+        self.set_interval(0.5, self.update_info)
+    
+    def update_info(self) -> None:
+        """Update agent info display"""
+        output = []
+        
+        # Agent configuration
+        output.append(f"[bold]Model:[/bold] {self.agent.llm}")
+        output.append(f"[bold]Storage:[/bold] {self.agent.path}")
+        output.append(f"[bold]Messages:[/bold] {len(self.agent.messages)}")
+        
+        # Show last few messages
+        if self.agent.messages:
+            output.append("\n[bold]Recent Messages:[/bold]")
+            
+            # Get last 3 exchanges (user + assistant)
+            recent_messages = self.agent.messages[-6:]
+            for msg in recent_messages:
+                role_color = "cyan" if msg.role == "user" else "green" if msg.role == "assistant" else "yellow"
+                
+                if msg.content:
+                    # Truncate long messages
+                    content = msg.content[:100] + "..." if len(msg.content) > 100 else msg.content
+                    content = content.replace("\n", " ")  # Single line
+                    output.append(f"[{role_color}]{msg.role:>10}:[/{role_color}] {content}")
+                
+                if msg.tool_calls:
+                    for tool_call in msg.tool_calls:
+                        output.append(f"[yellow]      tool:[/yellow] {tool_call.function['name']}")
+        
+        self.update("\n".join(output))
 
 
 class MetricsWidget(Static):
@@ -60,14 +105,15 @@ class MetricsWidget(Static):
         self.update("\n".join(output))
 
 
-class BehaviorTreeWidget(Tree):
-    """Widget for displaying behavior tree"""
+class SidebarWidget(Tree):
+    """Widget for sidebar navigation"""
     
+    selected_view = reactive("agent_info")
     selected_activity_id = reactive(None)
     selected_behavior_name = reactive(None)
     
     def __init__(self, agent: "A1", **kwargs):
-        super().__init__("📊 Behaviors & Activities", **kwargs)
+        super().__init__("🧭 Navigation", **kwargs)
         self.agent = agent
         self.show_root = True
         self.guide_depth = 2
@@ -77,10 +123,25 @@ class BehaviorTreeWidget(Tree):
         self.set_interval(0.5, self.update_tree)
     
     def update_tree(self) -> None:
-        """Update the behavior tree"""
+        """Update the sidebar tree"""
         self.clear()
         root = self.root
         
+        # Add main sections
+        agent_node = root.add("🤖 Agent Info")
+        agent_node.data = {"type": "view", "view": "agent_info"}
+        
+        behaviors_node = root.add("📊 Behaviors & Activities")
+        behaviors_node.allow_expand = True
+        behaviors_node.data = {"type": "view", "view": "behaviors"}
+        
+        logs_node = root.add("📜 System Logs")
+        logs_node.data = {"type": "view", "view": "logs"}
+        
+        metrics_node = root.add("📈 Metrics")
+        metrics_node.data = {"type": "view", "view": "metrics"}
+        
+        # Populate behaviors
         for behavior in self.agent.behavior_manager.behaviors.values():
             # Add behavior node
             behavior_text = f"{behavior.name} v{behavior.version}"
@@ -92,7 +153,7 @@ class BehaviorTreeWidget(Tree):
             if behavior.interval:
                 behavior_text += f" ⏱️ {behavior.interval}s"
             
-            behavior_node = root.add(behavior_text)
+            behavior_node = behaviors_node.add(behavior_text)
             behavior_node.allow_expand = True
             behavior_node.data = {"type": "behavior", "name": behavior.name}
             
@@ -124,6 +185,8 @@ class BehaviorTreeWidget(Tree):
                 completed_node.expand()
             
             behavior_node.expand()
+        
+        behaviors_node.expand()
     
     def _format_duration(self, activity: "Activity") -> str:
         """Format activity duration"""
@@ -143,10 +206,16 @@ class BehaviorTreeWidget(Tree):
         if event.node.data:
             data = event.node.data
             if isinstance(data, dict):
-                if data["type"] == "activity":
+                if data["type"] == "view":
+                    self.selected_view = data["view"]
+                    self.selected_activity_id = None
+                    self.selected_behavior_name = None
+                elif data["type"] == "activity":
+                    self.selected_view = "activity"
                     self.selected_activity_id = data["id"]
                     self.selected_behavior_name = data["behavior"]
                 elif data["type"] == "behavior":
+                    self.selected_view = "behavior"
                     self.selected_activity_id = None
                     self.selected_behavior_name = data["name"]
             else:
@@ -155,62 +224,162 @@ class BehaviorTreeWidget(Tree):
                 self.selected_behavior_name = None
 
 
-class ActivityDetailWidget(ScrollableContainer):
-    """Widget for displaying activity details or system logs"""
+class MainContentWidget(ScrollableContainer):
+    """Widget for displaying main content based on sidebar selection"""
     
     def __init__(self, agent: "A1", **kwargs):
         super().__init__(**kwargs)
         self.agent = agent
-        self.border_title = "Activity Detail / System Logs"
+        self.border_title = "🤖 Agent Info"
+        
+        # Different view widgets
+        self.agent_info_widget = Static()
         self.log_widget = Log(highlight=True)
-        self.detail_widget = Static()
-        self.showing_logs = True
+        self.activity_detail_widget = Static()
+        self.metrics_widget = Static()
+        
+        self.current_view = "agent_info"
         self.current_filter = {"behavior": None, "activity": None, "context": None}
     
     def compose(self) -> ComposeResult:
+        yield self.agent_info_widget
         yield self.log_widget
-        yield self.detail_widget
+        yield self.activity_detail_widget
+        yield self.metrics_widget
     
     def on_mount(self) -> None:
         """Set up periodic updates"""
         self.set_interval(0.5, self.update_display)
-        self.detail_widget.display = False
+        self.set_interval(0.5, self.update_content)
+        
+        # Initially show only agent info
+        self.agent_info_widget.display = True
+        self.log_widget.display = False
+        self.activity_detail_widget.display = False
+        self.metrics_widget.display = False
     
-    def show_activity(self, activity_id: Optional[str], behavior_name: Optional[str] = None) -> None:
-        """Show activity detail or filtered logs"""
-        if activity_id:
+    def show_view(self, view: str, activity_id: Optional[str] = None, behavior_name: Optional[str] = None) -> None:
+        """Show a specific view based on sidebar selection"""
+        # Hide all views first
+        self.agent_info_widget.display = False
+        self.log_widget.display = False
+        self.activity_detail_widget.display = False
+        self.metrics_widget.display = False
+        
+        self.current_view = view
+        
+        if view == "agent_info":
+            self.border_title = "🤖 Agent Info"
+            self.agent_info_widget.display = True
+            self._update_agent_info()
+            
+        elif view == "logs":
+            self.border_title = "📜 System Logs"
+            self.log_widget.display = True
+            self.current_filter = {"behavior": None, "activity": None, "context": None}
+            self._refresh_logs()
+            
+        elif view == "metrics":
+            self.border_title = "📈 Metrics"
+            self.metrics_widget.display = True
+            self._update_metrics()
+            
+        elif view == "behavior" and behavior_name:
+            self.border_title = f"📊 Behavior: {behavior_name}"
+            self.log_widget.display = True
+            self.current_filter = {"behavior": behavior_name, "activity": None, "context": None}
+            self._refresh_logs()
+            
+        elif view == "activity" and activity_id:
             # Find the activity
             activity = None
             for behavior in self.agent.behavior_manager.behaviors.values():
                 if activity_id in behavior.activities:
                     activity = behavior.activities[activity_id]
-                    behavior_name = behavior.name
+                    if not behavior_name:
+                        behavior_name = behavior.name
                     break
             
             if activity:
-                self.showing_logs = False
-                self.log_widget.display = False
-                self.detail_widget.display = True
-                self.border_title = f"Activity: {activity.name}"
+                self.border_title = f"🏃 Activity: {activity.name}"
+                self.activity_detail_widget.display = True
                 self._update_activity_detail(activity)
-                # Update filter for activity logs
                 self.current_filter = {"behavior": behavior_name, "activity": activity.name, "context": None}
-                return
+    
+    def _update_agent_info(self) -> None:
+        """Update agent info display"""
+        output = []
         
-        # Show logs with optional behavior filter
-        self.showing_logs = True
-        self.log_widget.display = True
-        self.detail_widget.display = False
+        # Agent configuration
+        output.append(f"[bold]Model:[/bold] {self.agent.llm}")
+        output.append(f"[bold]Storage:[/bold] {self.agent.path}")
+        output.append(f"[bold]Messages:[/bold] {len(self.agent.messages)}")
+        output.append("")
         
-        if behavior_name:
-            self.border_title = f"Logs: {behavior_name}"
-            self.current_filter = {"behavior": behavior_name, "activity": None, "context": None}
-        else:
-            self.border_title = "System Logs"
-            self.current_filter = {"behavior": None, "activity": None, "context": None}
+        # Behaviors summary
+        output.append("[bold]Active Behaviors:[/bold]")
+        for behavior in self.agent.behavior_manager.behaviors.values():
+            status = "✅" if behavior.enabled else "❌"
+            output.append(f"  {status} {behavior.name} v{behavior.version}")
+        output.append("")
         
-        # Refresh logs with new filter
-        self._refresh_logs()
+        # Show recent messages
+        if self.agent.messages:
+            output.append("[bold]Recent Conversation:[/bold]")
+            
+            # Get last 10 messages
+            recent_messages = self.agent.messages[-10:]
+            for msg in recent_messages:
+                role_color = "cyan" if msg.role == "user" else "green" if msg.role == "assistant" else "yellow"
+                
+                if msg.content:
+                    # Truncate long messages
+                    content = msg.content[:200] + "..." if len(msg.content) > 200 else msg.content
+                    content = content.replace("\n", " ")  # Single line
+                    output.append(f"\n[{role_color}]{msg.role:>10}:[/{role_color}]")
+                    output.append(f"  {content}")
+                
+                if msg.tool_calls:
+                    for tool_call in msg.tool_calls:
+                        func_name = tool_call.function["name"]
+                        output.append(f"\n[yellow]      tool:[/yellow] {func_name}")
+                        # Show tool arguments
+                        args = json.loads(tool_call.function.get("arguments", "{}"))
+                        for key, value in args.items():
+                            output.append(f"        {key}: {value}")
+        
+        self.agent_info_widget.update("\n".join(output))
+    
+    def _update_metrics(self) -> None:
+        """Update metrics display"""
+        # Tool metrics
+        tool_metrics = self.agent.metrics.get_tool_summary()
+        
+        if not tool_metrics:
+            self.metrics_widget.update("No metrics available")
+            return
+        
+        output = []
+        output.append("[bold]Tool Metrics:[/bold]\n")
+        
+        # Create table header
+        output.append("Tool         | Calls | Success | Avg Time | P95 Time")
+        output.append("-------------|-------|---------|----------|----------")
+        
+        for tool_name, summary in tool_metrics.items():
+            success_rate = (summary.success_count / summary.count * 100) if summary.count > 0 else 0
+            output.append(
+                f"{tool_name:<12} | {summary.count:>5} | {success_rate:>6.0f}% | "
+                f"{summary.avg_duration:>7.2f}s | {summary.p95_duration:>7.2f}s"
+            )
+        
+        # Conversation metrics
+        conv_summary = self.agent.metrics.get_conversation_summary()
+        if conv_summary:
+            output.append(f"\n[bold]Conversation:[/bold] {conv_summary.get('turns', 0)} turns, "
+                         f"{conv_summary.get('total_tokens', 0)} tokens")
+        
+        self.metrics_widget.update("\n".join(output))
     
     def _update_activity_detail(self, activity: "Activity") -> None:
         """Update activity detail display"""
@@ -241,27 +410,36 @@ class ActivityDetailWidget(ScrollableContainer):
             for log in activity.logs[-20:]:  # Last 20 logs
                 detail_parts.append(f"  {log}")
         
-        self.detail_widget.update("\n".join(detail_parts))
+        self.activity_detail_widget.update("\n".join(detail_parts))
     
     def update_display(self) -> None:
-        """Update the display based on current state"""
-        tree_widget = self.app.query_one(BehaviorTreeWidget)
+        """Update the display based on sidebar selection"""
+        sidebar = self.app.query_one(SidebarWidget)
         
         # Check if selection changed
-        activity_changed = tree_widget.selected_activity_id != getattr(self, '_last_activity_id', None)
-        behavior_changed = tree_widget.selected_behavior_name != getattr(self, '_last_behavior_name', None)
+        view_changed = sidebar.selected_view != getattr(self, '_last_view', None)
+        activity_changed = sidebar.selected_activity_id != getattr(self, '_last_activity_id', None)
+        behavior_changed = sidebar.selected_behavior_name != getattr(self, '_last_behavior_name', None)
         
-        if activity_changed or behavior_changed:
-            self._last_activity_id = tree_widget.selected_activity_id
-            self._last_behavior_name = tree_widget.selected_behavior_name
-            self.show_activity(tree_widget.selected_activity_id, tree_widget.selected_behavior_name)
-        elif not self.showing_logs and self._last_activity_id:
+        if view_changed or activity_changed or behavior_changed:
+            self._last_view = sidebar.selected_view
+            self._last_activity_id = sidebar.selected_activity_id
+            self._last_behavior_name = sidebar.selected_behavior_name
+            self.show_view(sidebar.selected_view, sidebar.selected_activity_id, sidebar.selected_behavior_name)
+    
+    def update_content(self) -> None:
+        """Update content for the current view"""
+        if self.current_view == "agent_info":
+            self._update_agent_info()
+        elif self.current_view == "metrics":
+            self._update_metrics()
+        elif self.current_view == "activity" and self._last_activity_id:
             # Update activity detail if showing
-            self.show_activity(self._last_activity_id, self._last_behavior_name)
+            self.show_view("activity", self._last_activity_id, self._last_behavior_name)
     
     def add_log(self, log_msg: LogMessage) -> None:
         """Add a log message if it matches current filter"""
-        if self.showing_logs:
+        if self.current_view in ["logs", "behavior", "activity"] and self.log_widget.display:
             # Check if message matches current filter
             if self.current_filter["behavior"] and log_msg.behavior != self.current_filter["behavior"]:
                 return
@@ -294,29 +472,28 @@ class ARAMonitorApp(App):
     """Textual application for ARA monitoring"""
     
     CSS = """
-    BehaviorTreeWidget {
-        width: 40%;
+    SidebarWidget {
+        width: 25%;
         height: 100%;
         border: solid cyan;
         overflow-y: auto;
+        dock: left;
     }
     
-    ActivityDetailWidget {
-        width: 60%;
-        height: 65%;
+    MainContentWidget {
+        width: 1fr;
+        height: 100%;
         border: solid blue;
         overflow-y: auto;
-    }
-    
-    MetricsWidget {
-        width: 60%;
-        height: 35%;
-        border: solid magenta;
         padding: 1;
-        overflow-y: auto;
     }
     
     Log {
+        overflow-y: auto;
+        height: 100%;
+    }
+    
+    Static {
         overflow-y: auto;
         height: 100%;
     }
@@ -339,10 +516,8 @@ class ARAMonitorApp(App):
         """Create app layout"""
         yield Header()
         with Horizontal():
-            yield BehaviorTreeWidget(self.agent)
-            with Vertical():
-                yield ActivityDetailWidget(self.agent, id="activity_detail")
-                yield MetricsWidget(self.agent)
+            yield SidebarWidget(self.agent)
+            yield MainContentWidget(self.agent, id="main_content")
         yield Footer()
     
     def on_mount(self) -> None:
@@ -351,12 +526,12 @@ class ARAMonitorApp(App):
     
     def _setup_log_handler(self) -> None:
         """Set up log router handler to capture logs"""
-        detail_widget = self.query_one("#activity_detail", ActivityDetailWidget)
+        main_content = self.query_one("#main_content", MainContentWidget)
         
         def tui_handler(log_msg: LogMessage):
             """Handle log messages from the router"""
             # Post message to main thread
-            self.call_from_thread(detail_widget.add_log, log_msg)
+            self.call_from_thread(main_content.add_log, log_msg)
         
         # Set the TUI handler in the log router
         log_router.set_tui_handler(tui_handler)
@@ -371,8 +546,9 @@ class ARAMonitorApp(App):
     
     def action_clear_selection(self) -> None:
         """Clear activity selection"""
-        tree_widget = self.query_one(BehaviorTreeWidget)
-        tree_widget.selected_activity_id = None
+        sidebar = self.query_one(SidebarWidget)
+        sidebar.selected_activity_id = None
+        sidebar.selected_view = "agent_info"
     
     def action_toggle_log_level(self) -> None:
         """Toggle between INFO and DEBUG log levels"""
