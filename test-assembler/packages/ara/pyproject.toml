@@ -2,7 +2,11 @@
 name = "ara"
 version = "0.1.0"
 description = "Ara package for the monorepo"
-dependencies = []
+dependencies = [
+    "nest-asyncio>=1.6.0",
+    "openai>=1.94.0",
+    "openai-agents>=0.1.0",
+]
 
 [build-system]
 requires = ["hatchling"]
