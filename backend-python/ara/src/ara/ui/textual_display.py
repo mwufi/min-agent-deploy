@@ -113,9 +113,9 @@ class SidebarWidget(Tree):
     selected_behavior_name = reactive(None)
     
     def __init__(self, agent: "A1", **kwargs):
-        super().__init__("🧭 Navigation", **kwargs)
+        super().__init__("", **kwargs)  # No root label
         self.agent = agent
-        self.show_root = True
+        self.show_root = False  # Hide root node
         self.guide_depth = 2
     
     def on_mount(self) -> None:
@@ -483,7 +483,7 @@ class ARAMonitorApp(App):
     MainContentWidget {
         width: 1fr;
         height: 100%;
-        border: solid blue;
+        border: solid cyan;
         overflow-y: auto;
         padding: 1;
     }

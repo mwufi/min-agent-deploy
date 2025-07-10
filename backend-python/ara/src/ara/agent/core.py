@@ -42,7 +42,7 @@ class A1:
     
     def __init__(
         self,
-        path: Union[str, Path] = "./data",
+        path: Union[str, Path] = "./dev-data",
         llm: str = "anthropic/claude-3.5-sonnet",
         api_key: Optional[str] = None,
         behaviors: Optional[List[Behavior]] = None,
