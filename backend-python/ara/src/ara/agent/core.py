@@ -92,6 +92,12 @@ class A1:
         
         self.logger.info(f"Agent initialized with storage at {self.path}")
     
+    def add_behavior(self, behavior: Behavior) -> None:
+        """Add a behavior to the agent"""
+        self.behavior_manager.register(behavior)
+        if hasattr(behavior, 'initialize'):
+            asyncio.create_task(behavior.initialize(self))
+
     def has_behavior(self, requirement: str) -> bool:
         """Check if agent has a behavior (convenience method)"""
         return self.behavior_manager.has_behavior(requirement)
@@ -258,7 +264,7 @@ class A1:
         except Exception as e:
             duration = (datetime.now() - start_time).total_seconds()
             self.metrics.record_tool_call(function_name, duration, success=False, error=str(e))
-            logger.error(f"Tool execution error: {e}")
+            self.logger.error(f"Tool execution error: {e}")
             
             # Notify behaviors of error
             await self.behavior_manager.on_error(e, self)
@@ -336,7 +342,7 @@ class A1:
             return result
             
         except Exception as e:
-            logger.error(f"Error in agent execution: {e}")
+            self.logger.error(f"Error in agent execution: {e}")
             self.ui.log_error(str(e))
             await self.behavior_manager.on_error(e, self)
             raise

@@ -22,6 +22,7 @@ Be concise and focus on completing the user's request efficiently.
         """Add planning context to prompts"""
         # For complex prompts, we could add planning instructions
         # For now, just pass through
+        self.logger.info(f"Pre-processing prompt: {prompt}")
         return prompt
     
     async def post_process(self, response: str, agent: "A1") -> str:
