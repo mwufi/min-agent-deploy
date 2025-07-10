@@ -108,7 +108,7 @@ Projects mentioned: {', '.join(summary_data['projects']) if summary_data['projec
 Please provide a brief, welcoming summary (2-3 sentences) that:
 1. Highlights 2-3 main themes or interests you've identified
 2. Asks for feedback or confirmation
-3. Maintains a friendly, helpful tone
+3. Talks from the persona of Sierra, the AI assistant
 
 Base it on this data: {json.dumps(summary_data, indent=2)}
 """
