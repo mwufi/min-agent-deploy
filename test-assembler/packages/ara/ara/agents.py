@@ -62,6 +62,48 @@ def detect_goals_llm(file: MarkdownFile) -> str:
     return run_sync(goal_detector, file.content)
 
 
+def summarize_note_llm(file: MarkdownFile) -> str:
+    """Summarize a note using LLM"""
+    summarizer = Agent(
+        name="summarizer",
+        instructions=load_prompt("extractors/summarizer.md"),
+        model="gpt-4o-mini",
+    )
+    return run_sync(summarizer, file.content)
+
+
+def extract_topics_llm(file: MarkdownFile) -> str:
+    """Extract topics using LLM"""
+    topic_extractor = Agent(
+        name="topic-extractor",
+        instructions=load_prompt("extractors/topic-extractor.md"),
+        model="gpt-4o-mini",
+    )
+    return run_sync(topic_extractor, file.content)
+
+
+def synthesize_narratives_llm(knowledge_data: Dict[str, Any]) -> str:
+    """Synthesize narratives and hypotheses using deep research agent"""
+    narrative_builder = Agent(
+        name="narrative-builder",
+        instructions=load_prompt("synthesizers/narrative-builder.md"),
+        model="gpt-4o",  # Using more capable model for synthesis
+    )
+    
+    # Convert knowledge data to a structured prompt
+    prompt = f"""
+Analyze the following extracted knowledge to construct narratives and hypotheses:
+
+Entities found: {json.dumps(knowledge_data.get('entities_summary', {}), indent=2)}
+Topics identified: {json.dumps(knowledge_data.get('topics_summary', {}), indent=2)}
+Note summaries: {json.dumps(knowledge_data.get('summaries_sample', []), indent=2)}
+
+Please provide narratives, hypotheses, and enhancement recommendations based on this data.
+"""
+    
+    return run_sync(narrative_builder, prompt)
+
+
 def create_biographer_summary(files: List[MarkdownFile], results: Dict[str, Any]) -> str:
     """Create a biographer-style summary of the ingested data"""
     
@@ -120,3 +162,41 @@ Base it on this data: {json.dumps(summary_data, indent=2)}
     )
     
     return run_sync(biographer, biographer_prompt)
+
+
+# Create agent instances for easy import
+entity_extractor_agent = Agent(
+    name="entity-extractor",
+    instructions=load_prompt("extractors/entity-extractor.md"),
+    model="gpt-4o-mini",
+)
+
+goal_detector_agent = Agent(
+    name="goal-detector", 
+    instructions=load_prompt("extractors/goal-detector.md"),
+    model="gpt-4o-mini",
+)
+
+summarizer_agent = Agent(
+    name="summarizer",
+    instructions=load_prompt("extractors/summarizer.md"),
+    model="gpt-4o-mini",
+)
+
+topic_extractor_agent = Agent(
+    name="topic-extractor",
+    instructions=load_prompt("extractors/topic-extractor.md"),
+    model="gpt-4o-mini",
+)
+
+narrative_builder_agent = Agent(
+    name="narrative-builder",
+    instructions=load_prompt("synthesizers/narrative-builder.md"),
+    model="gpt-4o",
+)
+
+biographer_agent = Agent(
+    name="biographer",
+    instructions="You are Sierra, an AI assistant helping to understand user data.",
+    model="gpt-4o-mini",
+)
