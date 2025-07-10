@@ -1,0 +1,9 @@
+[project]
+name = "ara"
+version = "0.1.0"
+description = "Ara package for the monorepo"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
