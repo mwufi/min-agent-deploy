@@ -10,7 +10,6 @@ timelines, and synthesized narratives.
 import argparse
 import asyncio
 import json
-import logging
 import os
 import sqlite3
 from dataclasses import dataclass, field
@@ -20,6 +19,17 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
+from loguru import logger
+import sys
+
+# Remove default logger and configure loguru
+logger.remove()
+
+# Suppress noisy HTTP logs
+import logging
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("openai").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 from packages.ara.ara.agents import (
     entity_extractor_agent, goal_detector_agent, biographer_agent,
@@ -122,6 +132,15 @@ class TaskExecutor:
         self.semaphore = asyncio.Semaphore(config.max_concurrent_calls)
         self.rate_limiter = asyncio.Queue(maxsize=config.rate_limit_per_minute)
         self.executor = ThreadPoolExecutor(max_workers=config.max_concurrent_calls)
+        self._initialized = False
+    
+    async def initialize(self):
+        """Initialize the rate limiter with tokens"""
+        if not self._initialized:
+            # Fill rate limiter with initial tokens
+            for _ in range(self.config.rate_limit_per_minute):
+                await self.rate_limiter.put(None)
+            self._initialized = True
         
     async def add_task(self, task: Task):
         """Add a task to the execution queue"""
@@ -130,17 +149,21 @@ class TaskExecutor:
     async def execute_task(self, task: Task) -> Dict[str, Any]:
         """Execute a single task with rate limiting"""
         async with self.semaphore:
-            # Rate limiting
-            await self.rate_limiter.put(None)
+            # Rate limiting - take a token
+            await self.rate_limiter.get()
             
             if self.config.dummy_mode:
                 # Dummy execution - just log
-                logging.info(f"[DUMMY] Executing task {task.id} of type {task.type}")
+                source = task.input_data.get('source', 'unknown')
+                logger.info(f"<green>{source}</green> → {task.type}")
                 await asyncio.sleep(0.1)  # Simulate work
                 return {"dummy": True, "task_id": task.id, "type": task.type}
             
             # Real execution
             try:
+                source = task.input_data.get('source', 'unknown')
+                logger.info(f"<green>{source}</green> → {task.type}")
+                
                 if task.type == "entity_extraction":
                     result = await asyncio.get_event_loop().run_in_executor(
                         self.executor,
@@ -149,6 +172,9 @@ class TaskExecutor:
                         task.input_data['content']
                     )
                     result = extract_json_from_string(result)
+                    if result:
+                        entity_count = sum(len(result.get(k, [])) for k in ['people', 'companies', 'projects', 'locations'])
+                        logger.debug(f"  └─ Found {entity_count} entities")
                 elif task.type == "goal_detection":
                     result = await asyncio.get_event_loop().run_in_executor(
                         self.executor,
@@ -157,6 +183,9 @@ class TaskExecutor:
                         task.input_data['content']
                     )
                     result = extract_json_from_string(result)
+                    if result:
+                        goal_count = len(result.get('goals', []))
+                        logger.debug(f"  └─ Found {goal_count} goals")
                 elif task.type == "summarization":
                     result = await asyncio.get_event_loop().run_in_executor(
                         self.executor,
@@ -165,6 +194,9 @@ class TaskExecutor:
                         task.input_data['content']
                     )
                     result = extract_json_from_string(result)
+                    if result:
+                        importance = result.get('importance', 0)
+                        logger.debug(f"  └─ Importance: {importance:.2f}")
                 elif task.type == "topic_extraction":
                     result = await asyncio.get_event_loop().run_in_executor(
                         self.executor,
@@ -173,6 +205,9 @@ class TaskExecutor:
                         task.input_data['content']
                     )
                     result = extract_json_from_string(result)
+                    if result:
+                        topic_count = len(result.get('topics', []))
+                        logger.debug(f"  └─ Found {topic_count} topics")
                 elif task.type == "synthesis":
                     result = await asyncio.get_event_loop().run_in_executor(
                         self.executor,
@@ -181,6 +216,10 @@ class TaskExecutor:
                         task.input_data['prompt']
                     )
                     result = extract_json_from_string(result)
+                    if result:
+                        narrative_count = len(result.get('narratives', []))
+                        hypothesis_count = len(result.get('hypotheses', []))
+                        logger.debug(f"  └─ Generated {narrative_count} narratives, {hypothesis_count} hypotheses")
                 else:
                     raise ValueError(f"Unknown task type: {task.type}")
                 
@@ -188,9 +227,16 @@ class TaskExecutor:
                 return result
                 
             except Exception as e:
-                logging.error(f"Error executing task {task.id}: {e}")
-                task.error = str(e)
-                raise
+                error_msg = str(e)
+                if "Connection error" in error_msg:
+                    logger.warning(f"Task {task.id} failed with connection error - will retry")
+                    # Don't raise, just return None and let the task be retried
+                    task.error = error_msg
+                    return None
+                else:
+                    logger.error(f"Task {task.id} failed: {e}")
+                    task.error = error_msg
+                    raise
     
     async def process_queue(self):
         """Process all tasks in the queue"""
@@ -207,8 +253,10 @@ class TaskExecutor:
         while True:
             await asyncio.sleep(60 / self.config.rate_limit_per_minute)
             try:
-                self.rate_limiter.get_nowait()
-            except asyncio.QueueEmpty:
+                # Try to add a token back
+                self.rate_limiter.put_nowait(None)
+            except asyncio.QueueFull:
+                # Queue is full, that's fine
                 pass
 
 
@@ -237,14 +285,28 @@ class KnowledgeManager:
         """Normalize entity name for deduplication"""
         return entity.lower().strip()
     
+    def _sanitize_filename(self, name: str) -> str:
+        """Sanitize a name to be safe for filesystem"""
+        # Replace problematic characters
+        name = name.replace('/', '_').replace('\\', '_').replace('@', 'at_')
+        name = name.replace(':', '_').replace('*', '_').replace('?', '_')
+        name = name.replace('"', '_').replace('<', '_').replace('>', '_')
+        name = name.replace('|', '_').replace('\n', '_').replace('\r', '_')
+        # Limit length
+        return name[:100]
+    
     def update_entity(self, entity: Dict[str, Any], source_note: str):
         """Update entity information with deduplication"""
         name = entity.get('name', '')
+        if not name:
+            return
+            
         normalized = self._normalize_entity(name)
         entity_type = entity.get('type', 'unknown')
         
-        # Check for similar entities (simple approach - can be enhanced)
-        entity_file = self.entities_dir / f"{normalized.replace(' ', '_')}.md"
+        # Create safe filename
+        safe_filename = self._sanitize_filename(normalized.replace(' ', '_'))
+        entity_file = self.entities_dir / f"{safe_filename}.md"
         
         if entity_file.exists():
             content = entity_file.read_text()
@@ -275,9 +337,12 @@ class KnowledgeManager:
     
     def update_summary(self, note_path: str, summary: str, importance: float):
         """Update summary for a note"""
-        # Convert path to safe filename
-        safe_name = note_path.replace('/', '_').replace('\\', '_')
-        summary_file = self.summaries_dir / f"{safe_name}.md"
+        # Convert path to safe filename - use hash for safety
+        path_hash = hashlib.md5(note_path.encode()).hexdigest()[:12]
+        safe_name = Path(note_path).stem[:50]  # First 50 chars of filename
+        # Remove any potentially dangerous characters
+        safe_name = "".join(c if c.isalnum() or c in '-_' else '_' for c in safe_name)
+        summary_file = self.summaries_dir / f"{safe_name}_{path_hash}.md"
         
         content = f"# Summary of {note_path}\n\nImportance: {importance:.2f}\n\n{summary}\n"
         summary_file.write_text(content)
@@ -292,6 +357,30 @@ class KnowledgeManager:
         hypothesis_file = self.hypotheses_dir / f"{hypothesis_id}.md"
         full_content = f"{content}\n\n## Test Plan\n{test_plan}\n"
         hypothesis_file.write_text(full_content)
+    
+    def update_goal(self, goal: Dict[str, Any], source_note: str):
+        """Update goal information"""
+        description = goal.get('description', '')
+        if not description:
+            return
+            
+        # Create a simple hash for the goal filename
+        goal_hash = hashlib.md5(description.encode()).hexdigest()[:8]
+        goal_file = self.goals_dir / f"goal_{goal_hash}.md"
+        
+        if goal_file.exists():
+            content = goal_file.read_text()
+            if source_note not in content:
+                content += f"\n- [[{source_note}]]"
+                goal_file.write_text(content)
+        else:
+            content = f"# Goal\n\n{description}\n\n"
+            if 'timeframe' in goal:
+                content += f"**Timeframe**: {goal['timeframe']}\n\n"
+            if 'status' in goal:
+                content += f"**Status**: {goal['status']}\n\n"
+            content += f"## References\n- [[{source_note}]]\n"
+            goal_file.write_text(content)
     
     def write_goals(self, goals: List[Dict[str, Any]]):
         """Write user enhancement goals"""
@@ -365,24 +454,63 @@ async def synthesize(executor: TaskExecutor, knowledge_mgr: KnowledgeManager):
     entities_summary = {}
     topics_summary = {}
     summaries_sample = []
+    goals_summary = []
     
     # Read entity files
-    for entity_file in knowledge_mgr.entities_dir.glob("*.md"):
-        entity_type = "entity"
-        if entity_file.stem not in entities_summary:
-            entities_summary[entity_file.stem] = []
-        entities_summary[entity_file.stem].append(entity_file.read_text()[:200])
+    try:
+        entity_files = list(knowledge_mgr.entities_dir.glob("*.md"))
+        for entity_file in entity_files[:10]:  # Limit to first 10
+            if entity_file.stem not in entities_summary:
+                entities_summary[entity_file.stem] = []
+            try:
+                content = entity_file.read_text()
+                entities_summary[entity_file.stem].append(content[:200])
+            except Exception as e:
+                logger.debug(f"Error reading entity file {entity_file}: {e}")
+    except Exception as e:
+        logger.debug(f"Error reading entities directory: {e}")
     
     # Read topic files
-    for topic_file in knowledge_mgr.topics_dir.glob("*.md"):
-        topic_name = topic_file.stem.replace('_', ' ')
-        topics_summary[topic_name] = len(topic_file.read_text().split('\n'))
+    try:
+        topic_files = list(knowledge_mgr.topics_dir.glob("*.md"))
+        for topic_file in topic_files[:10]:  # Limit to first 10
+            topic_name = topic_file.stem.replace('_', ' ')
+            try:
+                content = topic_file.read_text()
+                topics_summary[topic_name] = len(content.split('\n'))
+            except Exception as e:
+                logger.debug(f"Error reading topic file {topic_file}: {e}")
+    except Exception as e:
+        logger.debug(f"Error reading topics directory: {e}")
     
     # Read sample summaries
-    for i, summary_file in enumerate(knowledge_mgr.summaries_dir.glob("*.md")):
-        if i >= 5:  # Only sample first 5
-            break
-        summaries_sample.append(summary_file.read_text()[:300])
+    try:
+        summary_files = list(knowledge_mgr.summaries_dir.glob("*.md"))
+        for i, summary_file in enumerate(summary_files[:5]):  # Only sample first 5
+            try:
+                content = summary_file.read_text()
+                summaries_sample.append(content[:300])
+            except Exception as e:
+                logger.debug(f"Error reading summary file {summary_file}: {e}")
+    except Exception as e:
+        logger.debug(f"Error reading summaries directory: {e}")
+    
+    # Read goals
+    try:
+        goal_files = list(knowledge_mgr.goals_dir.glob("*.md"))
+        for goal_file in goal_files[:5]:  # Limit to first 5
+            try:
+                content = goal_file.read_text()
+                goals_summary.append(content[:200])
+            except Exception as e:
+                logger.debug(f"Error reading goal file {goal_file}: {e}")
+    except Exception as e:
+        logger.debug(f"Error reading goals directory: {e}")
+    
+    # Check if we have any data to synthesize
+    if not any([entities_summary, topics_summary, summaries_sample, goals_summary]):
+        logger.warning("No data found for synthesis - skipping")
+        return
     
     # Create synthesis task
     synthesis_task = Task(
@@ -395,6 +523,7 @@ Analyze the following extracted knowledge to construct narratives and hypotheses
 Entities found: {json.dumps(entities_summary, indent=2)}
 Topics identified: {json.dumps(topics_summary, indent=2)}
 Note summaries sample: {json.dumps(summaries_sample, indent=2)}
+Goals detected: {json.dumps(goals_summary, indent=2)}
 
 Please provide narratives, hypotheses, and enhancement recommendations based on this data.
 """
@@ -434,11 +563,25 @@ Please provide narratives, hypotheses, and enhancement recommendations based on 
 
 async def main(args):
     """Main execution function"""
-    # Setup logging
-    logging.basicConfig(
-        level=logging.INFO if not args.verbose else logging.DEBUG,
-        format='%(asctime)s - %(levelname)s - %(message)s'
-    )
+    # Setup loguru
+    log_level = "DEBUG" if args.verbose else "INFO"
+    
+    # Detect if we should use colors (check if output is a TTY)
+    use_colors = sys.stderr.isatty() and not args.no_color if hasattr(args, 'no_color') else sys.stderr.isatty()
+    
+    # Configure logger format based on verbosity
+    if args.verbose:
+        # Detailed format for debug
+        logger.add(sys.stderr, 
+                   format="<dim>{time:HH:mm:ss}</dim> | <level>{level:<8}</level> | <cyan>{name}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+                   level=log_level,
+                   colorize=use_colors)
+    else:
+        # Simple format for info
+        logger.add(sys.stderr,
+                   format="{message}",
+                   level=log_level,
+                   colorize=use_colors)
     
     # Initialize components
     config = ExecutionConfig(
@@ -454,16 +597,19 @@ async def main(args):
     knowledge_mgr = KnowledgeManager(output_dir)
     timeline = Timeline(timeline_db)
     
+    # Initialize executor
+    await executor.initialize()
+    
     # Start rate limiter
     rate_limiter_task = asyncio.create_task(executor.start_rate_limiter())
     
     try:
         # Load notes
-        logging.info(f"Loading notes from {args.input}")
+        logger.info(f"📂 Loading notes from <blue>{args.input}</blue>...")
         md_dir = MarkdownDirectory(args.input)
         md_dir.load()  # Load the files
         notes = [{'path': str(f.path), 'content': f.content} for f in md_dir.files]
-        logging.info(f"Found {len(notes)} notes to analyze")
+        logger.info(f"📝 Found <yellow>{len(notes)}</yellow> notes to analyze")
         
         # Phase 1: Analyze all notes
         all_tasks = []
@@ -471,46 +617,76 @@ async def main(args):
             tasks = await analyze_note(note, executor, knowledge_mgr, timeline)
             all_tasks.extend(tasks)
         
-        logging.info(f"Scheduled {len(all_tasks)} tasks for execution")
+        logger.info(f"🚀 Scheduled <cyan>{len(all_tasks)}</cyan> tasks across <yellow>{len(notes)}</yellow> notes")
         
         # Execute all analysis tasks
         results = await executor.process_queue()
         
         # Process results and update knowledge base
         for task in all_tasks:
-            if task.result and not task.error:
-                if task.type == "entity_extraction" and task.result:
-                    # Process different entity types
-                    for entity_type in ['people', 'companies', 'projects', 'locations']:
-                        if entity_type in task.result:
-                            for entity_name in task.result[entity_type]:
+            try:
+                if task.result and not task.error:
+                    if task.type == "entity_extraction" and isinstance(task.result, dict):
+                        # Process different entity types
+                        for entity_type in ['people', 'companies', 'projects', 'locations']:
+                            if entity_type in task.result and isinstance(task.result[entity_type], list):
+                                for entity_name in task.result[entity_type]:
+                                    if entity_name and isinstance(entity_name, str):
+                                        knowledge_mgr.update_entity(
+                                            {'name': entity_name, 'type': entity_type.rstrip('s')},
+                                            task.input_data.get('source', 'unknown')
+                                        )
+                    
+                    elif task.type == "goal_detection" and isinstance(task.result, dict):
+                        # Process goals and projects
+                        goals = task.result.get('goals', [])
+                        projects = task.result.get('projects', [])
+                        
+                        for goal in goals:
+                            if isinstance(goal, dict):
+                                knowledge_mgr.update_goal(goal, task.input_data.get('source', 'unknown'))
+                            elif isinstance(goal, str) and goal:
+                                knowledge_mgr.update_goal({'description': goal}, task.input_data.get('source', 'unknown'))
+                        
+                        for project in projects:
+                            if isinstance(project, dict):
                                 knowledge_mgr.update_entity(
-                                    {'name': entity_name, 'type': entity_type.rstrip('s')},
+                                    {'name': project.get('name', 'Unknown Project'), 'type': 'project'},
                                     task.input_data.get('source', 'unknown')
                                 )
-                
-                elif task.type == "topic_extraction" and task.result and 'topics' in task.result:
-                    for topic_data in task.result['topics']:
-                        if isinstance(topic_data, dict):
-                            knowledge_mgr.update_topic(
-                                topic_data.get('name', 'unknown'),
-                                task.input_data.get('source', 'unknown')
+                    
+                    elif task.type == "topic_extraction" and isinstance(task.result, dict):
+                        topics = task.result.get('topics', [])
+                        if isinstance(topics, list):
+                            for topic_data in topics:
+                                if isinstance(topic_data, dict) and 'name' in topic_data:
+                                    knowledge_mgr.update_topic(
+                                        topic_data['name'],
+                                        task.input_data.get('source', 'unknown')
+                                    )
+                                elif isinstance(topic_data, str) and topic_data:
+                                    knowledge_mgr.update_topic(
+                                        topic_data, 
+                                        task.input_data.get('source', 'unknown')
+                                    )
+                    
+                    elif task.type == "summarization" and isinstance(task.result, dict):
+                        summary = task.result.get('summary', '')
+                        importance = task.result.get('importance', 0.5)
+                        if summary and isinstance(importance, (int, float)):
+                            knowledge_mgr.update_summary(
+                                task.input_data.get('source', 'unknown'),
+                                summary,
+                                float(importance)
                             )
-                        else:
-                            knowledge_mgr.update_topic(topic_data, task.input_data.get('source', 'unknown'))
-                
-                elif task.type == "summarization" and task.result:
-                    knowledge_mgr.update_summary(
-                        task.input_data.get('source', 'unknown'),
-                        task.result.get('summary', ''),
-                        task.result.get('importance', 0.5)
-                    )
+            except Exception as e:
+                logger.error(f"Error processing {task.id} results: {e}")
         
         # Phase 2: Synthesis
-        logging.info("Starting synthesis phase...")
+        logger.info("🧠 Starting synthesis phase...")
         await synthesize(executor, knowledge_mgr)
         
-        logging.info("Analysis complete!")
+        logger.success(f"✨ Analysis complete! Knowledge saved to <green>{args.output}</green>")
         
     finally:
         # Cleanup
@@ -527,6 +703,7 @@ if __name__ == "__main__":
     parser.add_argument("--rate-limit", type=int, default=100, help="Rate limit per minute")
     parser.add_argument("--dummy", action="store_true", help="Run in dummy mode (no real LLM calls)")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
+    parser.add_argument("--no-color", action="store_true", help="Disable colored output")
     
     args = parser.parse_args()
     

@@ -10,6 +10,7 @@ class MarkdownFile:
     path: Path
     content: str
     metadata: Dict[str, Any] = None
+    is_binary: bool = False
     
     def __post_init__(self):
         if self.metadata is None:
@@ -23,15 +24,19 @@ class MarkdownDirectory:
         paths: Optional[List[str]] = None,
         exclude_paths: Optional[List[str]] = None,
         patterns: Optional[List[str]] = None,
-        exclude_patterns: Optional[List[str]] = None
+        exclude_patterns: Optional[List[str]] = None,
+        include_images: bool = False
     ):
         self.base_path = Path(base_path)
         self.paths = paths or []
         self.exclude_paths = exclude_paths or []
         self.patterns = patterns or ["*.md", "*.markdown"]
+        if include_images:
+            self.patterns.extend(["*.jpg", "*.jpeg", "*.png", "*.gif", "*.webp"])
         self.exclude_patterns = exclude_patterns or []
         self.files: List[MarkdownFile] = []
         self.processed_results: Dict[str, Any] = {}
+        self.include_images = include_images
         
     def _should_include_file(self, file_path: Path) -> bool:
         relative_path = file_path.relative_to(self.base_path)
@@ -77,15 +82,28 @@ class MarkdownDirectory:
                 
                 if self._should_include_file(file_path):
                     try:
-                        content = file_path.read_text(encoding='utf-8')
-                        self.files.append(MarkdownFile(
-                            path=file_path,
-                            content=content
-                        ))
+                        # Check if it's an image file
+                        image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
+                        if file_path.suffix.lower() in image_extensions:
+                            # For images, store path as content placeholder
+                            self.files.append(MarkdownFile(
+                                path=file_path,
+                                content=f"[Image: {file_path.name}]",
+                                is_binary=True
+                            ))
+                        else:
+                            # Regular text file
+                            content = file_path.read_text(encoding='utf-8')
+                            self.files.append(MarkdownFile(
+                                path=file_path,
+                                content=content,
+                                is_binary=False
+                            ))
                     except Exception as e:
-                        print(f"Error reading {file_path}: {e}")
+                        # Silent fail - just skip problematic files
+                        pass
                         
-        print(f"Loaded {len(self.files)} markdown files")
+        # Silent - logging happens in the main script
         return self
         
     def apply(self, func: Callable[[MarkdownFile], Any], name: str = None) -> 'MarkdownDirectory':

@@ -200,3 +200,9 @@ biographer_agent = Agent(
     instructions="You are Sierra, an AI assistant helping to understand user data.",
     model="gpt-4o-mini",
 )
+
+vision_to_text_agent = Agent(
+    name="vision-to-text",
+    instructions=load_prompt("extractors/vision-to-text.md"),
+    model="gpt-4o",  # Multimodal model
+)
