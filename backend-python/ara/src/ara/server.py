@@ -12,13 +12,15 @@ import uvicorn
 
 from ara.agent.core import A1
 from ara.behaviors.planning import PlanningBehavior
-
+from ara.behaviors.knowledge_management import KnowledgeManagementBehavior
 
 class ChatSession:
     def __init__(self, session_id: str):
         self.session_id = session_id
+        # let's create our new agent!
         self.agent = A1(api_key=None)  # Will use env var OPENROUTER_API_KEY
         self.agent.add_behavior(PlanningBehavior())
+        self.agent.add_behavior(KnowledgeManagementBehavior())
         self.messages: List[dict] = []
         self.started = False
     

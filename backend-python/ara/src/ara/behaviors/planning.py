@@ -13,9 +13,10 @@ class PlanningBehavior(Behavior):
     def __init__(self):
         super().__init__("planning")
         self.planning_prompt = """
-You are an AI assistant with access to tools for file operations.
+<planning_prompt>
 When given a complex task, break it down into steps if needed.
 Be concise and focus on completing the user's request efficiently.
+</planning_prompt>
 """
     
     async def pre_process(self, prompt: str, agent: "A1") -> str:
@@ -34,3 +35,7 @@ Be concise and focus on completing the user's request efficiently.
         """Track tool usage for planning"""
         # Could log tool usage patterns for better planning
         pass
+
+    def prompt_block(self) -> str:
+        """Return a prompt block for the agent"""
+        return self.planning_prompt

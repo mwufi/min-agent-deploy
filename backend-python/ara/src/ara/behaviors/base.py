@@ -124,15 +124,21 @@ class Behavior(ABC):
             except Exception as e:
                 self.logger.error(f"Error in {self.name} periodic task: {e}")
     
-    @abstractmethod
     async def pre_process(self, prompt: str, agent: "A1") -> str:
         """Pre-process user prompt before sending to LLM"""
         return prompt
     
-    @abstractmethod
     async def post_process(self, response: str, agent: "A1") -> str:
         """Post-process LLM response before returning to user"""
         return response
+    
+    async def initialize(self, *args, **kwargs) -> None:
+        """Initialize the behavior"""
+        pass
+    
+    def prompt_block(self) -> str:
+        """Return a prompt block for the agent. This is added to the agent's system prompt."""
+        return ""
     
     async def on_tool_call(self, tool_name: str, args: dict, result: Any, agent: "A1") -> None:
         """Called when a tool is executed"""
