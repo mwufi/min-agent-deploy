@@ -58,9 +58,9 @@ class KnowledgeManagementBehavior(Behavior):
                 # Process immediately for now
                 await self._process_pending_entities(agent)
                 
-            activity.complete()
+            await self.complete_activity(activity)
         except Exception as e:
-            activity.error(f"Failed to extract entities: {e}")
+            await self.fail_activity(activity, f"Failed to extract entities: {e}")
     
     async def post_process(self, response: str, agent: "A1") -> str:
         """Also extract entities from agent responses."""
@@ -108,9 +108,9 @@ class KnowledgeManagementBehavior(Behavior):
                     activity.log(f"Failed to update dossier: {e}", level="error")
                     
             activity.log(f"Updated {processed} dossiers")
-            activity.complete()
+            await self.complete_activity(activity)
         except Exception as e:
-            activity.error(f"Failed to process entities: {e}")
+            await self.fail_activity(activity, f"Failed to process entities: {e}")
     
     async def _update_dossier(
         self, 
@@ -182,9 +182,9 @@ class KnowledgeManagementBehavior(Behavior):
             # - Relationship extraction between entities
             # - Summary generation for each dossier
             activity.log("Dossier consolidation not yet implemented")
-            activity.complete()
+            await self.complete_activity(activity)
         except Exception as e:
-            activity.error(f"Failed to consolidate dossiers: {e}")
+            await self.fail_activity(activity, f"Failed to consolidate dossiers: {e}")
     
     def prompt_block(self) -> str:
         """Provide context about knowledge management to the agent."""
